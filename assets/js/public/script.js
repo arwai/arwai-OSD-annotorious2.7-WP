@@ -24,15 +24,29 @@ jQuery(document).ready(function($) {
     }
     
     // Combine hardcoded options with dynamic options from the settings page
+    // Default OpenSeadragon options
     const finalOsdConfig = {
         id: viewerId,
         tileSources: images.map(img => ({
             type: img.type,
             url: img.url
         })),
-        ...osdOptions 
+        ...osdOptions // OSD Configuration from settings
     };
     
+    //add formatter to highlight important annotations
+    // This formatter will add a class to annotations that are tagged as 'important'
+    MyImportantFormatter = function(annotation) {
+        const isImportant = annotation.bodies.find(b => {
+            return b.purpose === 'tagging' && b.value.toLowerCase() === 'important'
+        });
+        
+        if (isImportant) {
+            return 'important';
+        }
+    };
+
+    // Initialize OpenSeadragon viewer
     const osdViewer = OpenSeadragon(finalOsdConfig);
 
     // Prepare Annotorious configuration
@@ -49,7 +63,9 @@ jQuery(document).ready(function($) {
                 widget: 'TAG', 
                 vocabulary: annoOptions.tagVocabulary || [] 
             }
-        ]
+        ],
+        formatters: MyImportantFormatter
+
     };
 
     // Initialize Annotorious
@@ -90,6 +106,7 @@ jQuery(document).ready(function($) {
             }
         });
     }
+
 
     // Function to load annotations for the currently visible image
     function loadAnnotationsForImage(attachmentId) {

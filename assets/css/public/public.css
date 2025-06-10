@@ -5,3 +5,17 @@
  */
 
 /* The main content area of the annotation body */
+
+  .a9s-annotation.important .a9s-inner {
+    stroke-width:2px;
+    stroke:blue;
+    fill:rgba(0,0,255,0.1);
+    -webkit-filter:drop-shadow(0 0 10px rgba(0,0,255,0.8));
+            filter:drop-shadow(0 0 10px rgba(0,0,255,0.8));
+  }
+
+  .a9s-annotation.important .a9s-inner:hover {
+    stroke-width:6px;
+    stroke:blue;
+    fill:rgba(0,0,255,0.3);
+  }
