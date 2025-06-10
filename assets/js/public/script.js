@@ -1,3 +1,28 @@
+/**
+ * A formatter to display a label on top of the annotation shape on the canvas.
+ * It looks for a body with the purpose 'arwai-AnnotationID' and displays its value.
+ */
+const arwaiAnnotationIDFormatter = function(annotation) {
+    // The annotation data is in the `body` array.
+    const labelBody = annotation.body.find(b => b.purpose === 'arwai-AnnotationID');
+
+    if (labelBody) {
+        // Create an SVG 'foreignObject' to wrap our HTML label.
+        // This is necessary to render HTML inside the SVG annotation layer.
+        const foreignObject = document.createElementNS('http://www.w3.org/2000/svg', 'foreignObject');
+
+        // Set the content of the foreignObject.
+        foreignObject.innerHTML =
+            `<label class="arwai-annotation-label" xmlns="http://www.w3.org/1999/xhtml">${labelBody.value}</label>`;
+        
+        // Return the element in the format Annotorious expects for canvas formatters.
+        return {
+           element: foreignObject
+        };
+    }
+}
+
+
 jQuery(document).ready(function($) {
 
     // Check if the main configuration object exists
@@ -24,48 +49,31 @@ jQuery(document).ready(function($) {
     }
     
     // Combine hardcoded options with dynamic options from the settings page
-    // Default OpenSeadragon options
     const finalOsdConfig = {
         id: viewerId,
         tileSources: images.map(img => ({
             type: img.type,
             url: img.url
         })),
-        ...osdOptions // OSD Configuration from settings
+        ...osdOptions 
     };
     
-    //add formatter to highlight important annotations
-    // This formatter will add a class to annotations that are tagged as 'important'
-    MyImportantFormatter = function(annotation) {
-        const isImportant = annotation.bodies.find(b => {
-            return b.purpose === 'tagging' && b.value.toLowerCase() === 'important'
-        });
-        
-        if (isImportant) {
-            return 'important';
-        }
-    };
-
-    // Initialize OpenSeadragon viewer
     const osdViewer = OpenSeadragon(finalOsdConfig);
 
     // Prepare Annotorious configuration
     const annoConfig = {
         fragmentUnit: 'percent',
-        // If no user is logged in, the entire annotation functionality is read-only.
-        // Otherwise, it respects the setting from the admin page.
-        readOnly: (currentUser === null) ? true : annoOptions.readOnly,
+        readOnly: (currentUser === null),
         allowEmpty: annoOptions.allowEmpty,
         drawOnSingleClick: annoOptions.drawOnSingleClick,
+        formatters: [ arwaiAnnotationIDFormatter ],
         widgets: [
-            'COMMENT', // Use the standard Comment widget
+            'COMMENT', 
             { 
                 widget: 'TAG', 
                 vocabulary: annoOptions.tagVocabulary || [] 
             }
-        ],
-        formatters: MyImportantFormatter
-
+        ]
     };
 
     // Initialize Annotorious
@@ -106,7 +114,6 @@ jQuery(document).ready(function($) {
             }
         });
     }
-
 
     // Function to load annotations for the currently visible image
     function loadAnnotationsForImage(attachmentId) {
@@ -149,7 +156,25 @@ jQuery(document).ready(function($) {
 
     // --- Annotation event handlers ---
     anno.on('createAnnotation', function(annotation) {
-        $.post(ajaxUrl, { action: 'arwai_anno_add', annotation: JSON.stringify(annotation) });
+        // Send the annotation to the backend to be saved.
+        $.post(ajaxUrl, { 
+            action: 'arwai_anno_add', 
+            annotation: JSON.stringify(annotation) 
+        }).done(function(response) {
+            // After the server saves it and adds the DB ID, it sends back the complete annotation.
+            if (response.success && response.data.annotation) {
+                const completeAnnotation = response.data.annotation;
+
+                // To update the annotation on screen, we remove the temporary one...
+                anno.removeAnnotation(annotation);
+
+                // ...and add the final, complete version from the server.
+                // This will re-trigger the formatter and display the new label.
+                anno.addAnnotation(completeAnnotation);
+            }
+        });
+
+        // Sync tags immediately
         syncTagsToWordPress(annotation);
     });
 
@@ -161,4 +186,5 @@ jQuery(document).ready(function($) {
     anno.on('deleteAnnotation', function(annotation) {
         $.post(ajaxUrl, { action: 'arwai_anno_delete', annotation: JSON.stringify(annotation), annotationid: annotation.id });
     });
+
 });

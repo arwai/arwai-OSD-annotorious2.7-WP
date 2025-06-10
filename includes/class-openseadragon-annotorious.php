@@ -587,6 +587,7 @@ class Openseadragon_Annotorious {
         wp_die();
     }
 
+
     function anno_add() {
         if ( ! is_user_logged_in() ) {
             wp_send_json_error( 'You must be logged in to create annotations.' );
@@ -595,22 +596,78 @@ class Openseadragon_Annotorious {
         global $wpdb;
         $annotation_json = isset($_POST['annotation']) ? wp_unslash($_POST['annotation']) : '';
         if (empty($annotation_json)) { wp_send_json_error('Annotation data missing.'); }
+        
         $annotation = json_decode($annotation_json, true);
         if (json_last_error() !== JSON_ERROR_NONE) { wp_send_json_error('Invalid JSON data.'); }
+
         $image_url = $annotation['target']['source'] ?? '';
         if (empty($image_url)) { wp_send_json_error('Annotation target source URL missing.'); }
+        
         $attachment_id = attachment_url_to_postid($image_url);
         if (empty($attachment_id)) { wp_send_json_error('Could not find attachment ID for source URL.'); }
-        $annotation_id = $annotation['id'] ?? '';
-        if (empty($annotation_id)) { wp_send_json_error('Annotorious ID missing.'); }
-        if (isset($annotation['body'][0]['value'])) { $annotation['body'][0]['value'] = wp_kses_post($annotation['body'][0]['value']); }
         
-        $wpdb->insert( $this->history_table_name, array('annotation_id_from_annotorious' => $annotation_id, 'attachment_id' => $attachment_id, 'action_type' => 'created', 'annotation_data_snapshot' => wp_json_encode($annotation), 'user_id' => get_current_user_id()), array('%s', '%d', '%s', '%s', '%d') );
-        $inserted = $wpdb->insert( $this->table_name, array('annotation_id_from_annotorious' => $annotation_id, 'attachment_id' => $attachment_id, 'annotation_data' => wp_json_encode($annotation)), array('%s', '%d', '%s') );
+        $annotation_id_from_annotorious = $annotation['id'] ?? '';
+        if (empty($annotation_id_from_annotorious)) { wp_send_json_error('Annotorious ID missing.'); }
+        
+        // Sanitize comment body if it exists
+        if (isset($annotation['body']) && is_array($annotation['body'])) {
+            foreach ($annotation['body'] as $key => $body_item) {
+                if (isset($body_item['purpose']) && $body_item['purpose'] === 'commenting' && isset($body_item['value'])) {
+                    $annotation['body'][$key]['value'] = wp_kses_post($body_item['value']);
+                }
+            }
+        }
+        
+        $inserted = $wpdb->insert(
+            $this->table_name,
+            array(
+                'annotation_id_from_annotorious' => $annotation_id_from_annotorious,
+                'attachment_id' => $attachment_id,
+                'annotation_data' => wp_json_encode($annotation)
+            ),
+            array('%s', '%d', '%s')
+        );
 
-        if ($inserted) { wp_send_json_success(['database_id' => $wpdb->insert_id]); } else { wp_send_json_error(['message' => 'Failed to add annotation.']); }
+        if ($inserted) {
+            $new_db_id = $wpdb->insert_id;
+
+            $arwai_id_body = [
+                'type'    => 'TextualBody',
+                'purpose' => 'arwai-AnnotationID',
+                'value'   => (string) $new_db_id,
+            ];
+
+            if (!isset($annotation['body']) || !is_array($annotation['body'])) {
+                $annotation['body'] = [];
+            }
+            $annotation['body'][] = $arwai_id_body;
+
+            $wpdb->update(
+                $this->table_name,
+                ['annotation_data' => wp_json_encode($annotation)],
+                ['id' => $new_db_id],
+                ['%s'],
+                ['%d']
+            );
+
+            $wpdb->insert( $this->history_table_name, array(
+                'annotation_id_from_annotorious' => $annotation_id_from_annotorious, 
+                'attachment_id' => $attachment_id, 
+                'action_type' => 'created', 
+                'annotation_data_snapshot' => wp_json_encode($annotation), 
+                'user_id' => get_current_user_id()
+            ), array('%s', '%d', '%s', '%s', '%d') );
+            
+            // Send the complete, updated annotation back to the frontend
+            wp_send_json_success(['annotation' => $annotation]);
+
+        } else {
+            wp_send_json_error(['message' => 'Failed to add annotation.']);
+        }
+        
         wp_die();
     }
+
 
     function anno_delete() {
         if ( ! is_user_logged_in() ) {

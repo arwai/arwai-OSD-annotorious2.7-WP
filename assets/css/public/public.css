@@ -19,3 +19,48 @@
     stroke:blue;
     fill:rgba(0,0,255,0.3);
   }
+
+
+/*
+ * CSS for the on-canvas annotation label.
+ * These rules are essential for making the label visible.
+ */
+.a9s-annotation foreignObject {
+    /* Make the container visible even if its size is 0x0 */
+    overflow: visible;
+
+    /* Force some browsers to render the object by giving it a tiny size */
+    width: 1px;
+    height: 1px;
+}
+
+/* Styling for the label itself */
+.arwai-annotation-label {
+    display: inline-block;
+    background-color: rgba(0, 0, 0, 0.75);
+    color: white;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-family: sans-serif;
+    font-size: 13px;
+    /* Position it above the top-left corner of the shape */
+    transform: translateY(-100%) translateY(-3px);
+}
+
+/* Styling for the list of tags in the popup */
+/* .r6o-widget.r6o-tag ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.r6o-widget.r6o-tag li {
+  display: inline-block;
+  background-color: #e9e9e9;
+  color: #333;
+  padding: 3px 8px;
+  border-radius: 4px;
+  margin-right: 5px;
+  margin-bottom: 5px;
+  font-size: 0.9em;
+} */
