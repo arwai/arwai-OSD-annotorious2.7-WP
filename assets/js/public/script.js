@@ -3,23 +3,35 @@
  * It looks for a body with the purpose 'arwai-AnnotationID' and displays its value.
  */
 const arwaiAnnotationIDFormatter = function(annotation) {
-    // The annotation data is in the `body` array.
     const labelBody = annotation.body.find(b => b.purpose === 'arwai-AnnotationID');
 
     if (labelBody) {
-        // Create an SVG 'foreignObject' to wrap our HTML label.
-        // This is necessary to render HTML inside the SVG annotation layer.
         const foreignObject = document.createElementNS('http://www.w3.org/2000/svg', 'foreignObject');
-
-        // Set the content of the foreignObject.
         foreignObject.innerHTML =
             `<label class="arwai-annotation-label" xmlns="http://www.w3.org/1999/xhtml">${labelBody.value}</label>`;
         
-        // Return the element in the format Annotorious expects for canvas formatters.
         return {
            element: foreignObject
         };
     }
+}
+
+/**
+ * A formatter to change the stroke color of an annotation if it has tags.
+ */
+const arwaiTagColorFormatter = function(annotation) {
+    // Find tagging bodies
+    const tagBodies = annotation.body.filter(function (body) {
+        return body.purpose === 'tagging';
+    });
+
+    // If there is at least one tag, return a blue stroke style.
+    if (tagBodies.length > 0) {
+        return 'tagged'; // This will use the default style for tagged annotations.
+    }
+
+    // Otherwise, return null to use the default style.
+    return null;
 }
 
 
@@ -60,13 +72,36 @@ jQuery(document).ready(function($) {
     
     const osdViewer = OpenSeadragon(finalOsdConfig);
 
+    // --- Translation Dictionary ---
+    const translations = {
+        'en-alt': {
+          'Add a comment...': 'Add a comment...',
+          'Add tag...': 'Add tag...',
+          'Cancel': 'Cancel',
+          'Done': 'Done'
+        },
+        'pt': {
+          'Add a comment...': 'Adicionar um comentário...',
+          'Add tag...': 'Adicionar etiqueta...',
+          'Cancel': 'Cancelar',
+          'Done': 'Feito'
+        }
+    };
+    
+    const currentLocale = annoOptions.locale || 'en-alt';
+
     // Prepare Annotorious configuration
     const annoConfig = {
         fragmentUnit: 'percent',
         readOnly: (currentUser === null),
         allowEmpty: annoOptions.allowEmpty,
         drawOnSingleClick: annoOptions.drawOnSingleClick,
-        formatters: [ arwaiAnnotationIDFormatter ],
+        formatters: [ 
+            arwaiAnnotationIDFormatter, 
+            arwaiTagColorFormatter 
+        ],
+        locale: currentLocale,
+        messages: translations[currentLocale] || translations['en-alt'],
         widgets: [
             'COMMENT', 
             { 
@@ -156,25 +191,17 @@ jQuery(document).ready(function($) {
 
     // --- Annotation event handlers ---
     anno.on('createAnnotation', function(annotation) {
-        // Send the annotation to the backend to be saved.
         $.post(ajaxUrl, { 
             action: 'arwai_anno_add', 
             annotation: JSON.stringify(annotation) 
         }).done(function(response) {
-            // After the server saves it and adds the DB ID, it sends back the complete annotation.
             if (response.success && response.data.annotation) {
                 const completeAnnotation = response.data.annotation;
-
-                // To update the annotation on screen, we remove the temporary one...
                 anno.removeAnnotation(annotation);
-
-                // ...and add the final, complete version from the server.
-                // This will re-trigger the formatter and display the new label.
                 anno.addAnnotation(completeAnnotation);
             }
         });
 
-        // Sync tags immediately
         syncTagsToWordPress(annotation);
     });
 

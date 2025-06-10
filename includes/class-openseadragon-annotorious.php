@@ -26,6 +26,8 @@ class Openseadragon_Annotorious {
     const OPTION_ANNO_ALLOW_EMPTY = 'arwai_anno_allow_empty';
     const OPTION_ANNO_DRAW_ON_SINGLE_CLICK = 'arwai_anno_draw_on_single_click';
     const OPTION_ANNO_TAGS_LINK_TAXONOMY = 'arwai_anno_tags_link_taxonomy';
+    // Annotorious constant for the LOCALE OPTION
+    const OPTION_ANNO_LOCALE = 'arwai_anno_locale';
 
     // OpenSeadragon Settings Keys
     private $osd_options_keys = [
@@ -102,6 +104,7 @@ class Openseadragon_Annotorious {
         register_setting('arwai_openseadragon_options_group', self::OPTION_ACTIVE_POST_TYPES, ['type' => 'array', 'sanitize_callback' => array( $this, 'sanitize_active_post_types_option' ), 'default' => array( 'post', 'page' )]);
         
         // Annotorious Settings
+        register_setting('arwai_openseadragon_options_group', self::OPTION_ANNO_LOCALE, ['type' => 'string', 'sanitize_callback' => 'sanitize_text_field', 'default' => 'en-alt']);
         register_setting('arwai_openseadragon_options_group', self::OPTION_ANNO_READ_ONLY, ['type' => 'boolean', 'sanitize_callback' => 'rest_sanitize_boolean', 'default' => false]);
         register_setting('arwai_openseadragon_options_group', self::OPTION_ANNO_ALLOW_EMPTY, ['type' => 'boolean', 'sanitize_callback' => 'rest_sanitize_boolean', 'default' => false]);
         register_setting('arwai_openseadragon_options_group', self::OPTION_ANNO_DRAW_ON_SINGLE_CLICK, ['type' => 'boolean', 'sanitize_callback' => 'rest_sanitize_boolean', 'default' => false]);
@@ -122,6 +125,7 @@ class Openseadragon_Annotorious {
         
         // Add settings sections
         add_settings_section('arwai_openseadragon_settings_section_main', 'Openseadragon-Annotorious Global Settings', null, 'arwai-openseadragon-settings');
+        add_settings_field('field_anno_locale', 'Language', array($this, 'field_anno_locale_callback'), 'arwai-openseadragon-settings', 'arwai_openseadragon_settings_section_annotorious');
         add_settings_field('arwai_openseadragon_active_post_types_field', 'Activate Plugin for Post Types', array( $this, 'active_post_types_callback' ), 'arwai-openseadragon-settings', 'arwai_openseadragon_settings_section_main');
         add_settings_field('arwai_openseadragon_default_new_post_mode_field', 'Default Viewer Mode for New Posts', array( $this, 'default_new_post_mode_callback' ), 'arwai-openseadragon-settings', 'arwai_openseadragon_settings_section_main');
         
@@ -130,6 +134,7 @@ class Openseadragon_Annotorious {
         add_settings_field('field_osd_gesture_options', '', array($this, 'field_osd_gesture_options_callback'), 'arwai-openseadragon-settings', 'arwai_openseadragon_settings_section_osd');
 
         add_settings_section('arwai_openseadragon_settings_section_annotorious', 'Annotorious Settings', null, 'arwai-openseadragon-settings');
+        add_settings_field('field_anno_locale', 'Language', array($this, 'field_anno_locale_callback'), 'arwai-openseadragon-settings', 'arwai_openseadragon_settings_section_annotorious');
         add_settings_field('field_anno_options', '', array($this, 'field_anno_options_callback'), 'arwai-openseadragon-settings', 'arwai_openseadragon_settings_section_annotorious');
         add_settings_field('field_anno_taxonomy', '', array($this, 'field_anno_taxonomy_callback'), 'arwai-openseadragon-settings', 'arwai_openseadragon_settings_section_annotorious');
     }
@@ -244,6 +249,18 @@ class Openseadragon_Annotorious {
                 </table>
             </div>
         </div>
+        <?php
+    }
+
+
+    public function field_anno_locale_callback() {
+        $current_locale = get_option(self::OPTION_ANNO_LOCALE, 'en-alt');
+        ?>
+        <select name="<?php echo esc_attr(self::OPTION_ANNO_LOCALE); ?>" id="<?php echo esc_attr(self::OPTION_ANNO_LOCALE); ?>">
+            <option value="en-alt" <?php selected($current_locale, 'en-alt'); ?>>English</option>
+            <option value="pt" <?php selected($current_locale, 'pt'); ?>>Português</option>
+        </select>
+        <p class="description">Select the language for the annotation editor pop-up.</p>
         <?php
     }
 
@@ -385,7 +402,9 @@ class Openseadragon_Annotorious {
                             'displayName' => $user->display_name,
                         ];
                     }
+
                     $anno_options = [
+                        'locale' => get_option(self::OPTION_ANNO_LOCALE, 'en-alt'),
                         'readOnly' => rest_sanitize_boolean(get_option(self::OPTION_ANNO_READ_ONLY, false)),
                         'allowEmpty' => rest_sanitize_boolean(get_option(self::OPTION_ANNO_ALLOW_EMPTY, false)),
                         'drawOnSingleClick' => rest_sanitize_boolean(get_option(self::OPTION_ANNO_DRAW_ON_SINGLE_CLICK, false)),
@@ -394,6 +413,7 @@ class Openseadragon_Annotorious {
                         'tagVocabulary' => [],
                         'currentUser' => $current_user_data,
                     ];
+
                     if ($linked_taxonomy !== 'none') {
                         $terms = get_terms(['taxonomy' => $linked_taxonomy, 'hide_empty' => false]);
                         if (!is_wp_error($terms) && !empty($terms)) {
@@ -519,7 +539,7 @@ class Openseadragon_Annotorious {
             delete_post_meta($post_id, self::META_IMAGE_IDS);
         }
 
-        // Save "Set First as Featured"
+        // Save "Set first image in collection as the post's Featured Image"
         $set_featured = isset($_POST[self::META_SET_FIRST_AS_FEATURED]) ? 'yes' : 'no';
         update_post_meta($post_id, self::META_SET_FIRST_AS_FEATURED, $set_featured);
         if ('yes' === $set_featured) {
