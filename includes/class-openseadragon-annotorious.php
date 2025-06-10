@@ -12,11 +12,27 @@ class Openseadragon_Annotorious {
     private $table_name;
     private $history_table_name;
 
+    // Meta and Option Keys
     const META_POST_DISPLAY_MODE = '_arwai_openseadragon_post_display_mode';
     const OPTION_DEFAULT_NEW_POST_MODE = 'arwai_openseadragon_default_new_post_mode';
     const META_SET_FIRST_AS_FEATURED = '_arwai_openseadragon_set_first_as_featured';
     const OPTION_ACTIVE_POST_TYPES = 'arwai_openseadragon_active_post_types';
     const META_IMAGE_IDS = '_arwai_multi_image_ids';
+
+    // OpenSeadragon Settings Keys
+    const OPTION_OSD_PREFIX_URL = 'arwai_osd_prefix_url';
+    const OPTION_OSD_SEQUENCE_MODE = 'arwai_osd_sequence_mode';
+    const OPTION_OSD_SHOW_SEQ_CONTROL = 'arwai_osd_show_sequence_control';
+    const OPTION_OSD_SHOW_REF_STRIP = 'arwai_osd_show_reference_strip';
+    const OPTION_OSD_SHOW_ROTATION = 'arwai_osd_show_rotation_control';
+    const OPTION_OSD_NAV_WRAP = 'arwai_osd_nav_prev_next_wrap';
+
+    // Annotorious Settings Keys
+    const OPTION_ANNO_READ_ONLY = 'arwai_anno_read_only';
+    const OPTION_ANNO_ALLOW_EMPTY = 'arwai_anno_allow_empty';
+    const OPTION_ANNO_DRAW_ON_SINGLE_CLICK = 'arwai_anno_draw_on_single_click';
+    const OPTION_ANNO_TAGS_LINK_TAXONOMY = 'arwai_anno_tags_link_taxonomy';
+
 
     function __construct() {
         global $wpdb;
@@ -43,8 +59,7 @@ class Openseadragon_Annotorious {
         add_action( 'wp_ajax_arwai_anno_update', array( $this, 'anno_update' ) );
         add_action( 'wp_ajax_arwai_get_annotorious_history', array( $this, 'get_annotorious_history' ) );
         add_action( 'wp_ajax_nopriv_arwai_get_annotorious_history', array( $this, 'get_annotorious_history' ) );
-
-        $this->filter_called = 0;
+        add_action( 'wp_ajax_arwai_add_taxonomy_term', array( $this, 'arwai_add_taxonomy_term' ) );
     }
 
     private function get_active_post_types() {
@@ -53,17 +68,41 @@ class Openseadragon_Annotorious {
     }
 
     public function settings_init() {
+        // Main Settings
         register_setting('arwai_openseadragon_options_group', self::OPTION_DEFAULT_NEW_POST_MODE, ['type' => 'string', 'sanitize_callback' => array( $this, 'sanitize_display_mode_option' ), 'default' => 'metabox_viewer']);
         register_setting('arwai_openseadragon_options_group', self::OPTION_ACTIVE_POST_TYPES, ['type' => 'array', 'sanitize_callback' => array( $this, 'sanitize_active_post_types_option' ), 'default' => array( 'post', 'page' )]);
         add_settings_section('arwai_openseadragon_settings_section_main', 'Openseadragon-Annotorious Global Settings', array($this, 'settings_section_main_callback'), 'arwai-openseadragon-settings');
         add_settings_field('arwai_openseadragon_default_new_post_mode_field', 'Default Viewer Mode for New Posts', array( $this, 'default_new_post_mode_callback' ), 'arwai-openseadragon-settings', 'arwai_openseadragon_settings_section_main');
         add_settings_field('arwai_openseadragon_active_post_types_field', 'Activate Plugin for Post Types', array( $this, 'active_post_types_callback' ), 'arwai-openseadragon-settings', 'arwai_openseadragon_settings_section_main');
+
+        // OpenSeadragon Viewer Settings
+        add_settings_section('arwai_openseadragon_settings_section_osd', 'OpenSeadragon Viewer Settings', null, 'arwai-openseadragon-settings');
+        register_setting('arwai_openseadragon_options_group', self::OPTION_OSD_PREFIX_URL, ['type' => 'string', 'sanitize_callback' => 'esc_url_raw', 'default' => ARWAI_OPENSEADRAGON_ANNOTORIOUS_URL . 'assets/images/']);
+        register_setting('arwai_openseadragon_options_group', self::OPTION_OSD_SEQUENCE_MODE, ['type' => 'boolean', 'sanitize_callback' => 'rest_sanitize_boolean', 'default' => true]);
+        register_setting('arwai_openseadragon_options_group', self::OPTION_OSD_SHOW_SEQ_CONTROL, ['type' => 'boolean', 'sanitize_callback' => 'rest_sanitize_boolean', 'default' => true]);
+        register_setting('arwai_openseadragon_options_group', self::OPTION_OSD_SHOW_REF_STRIP, ['type' => 'boolean', 'sanitize_callback' => 'rest_sanitize_boolean', 'default' => true]);
+        register_setting('arwai_openseadragon_options_group', self::OPTION_OSD_SHOW_ROTATION, ['type' => 'boolean', 'sanitize_callback' => 'rest_sanitize_boolean', 'default' => true]);
+        register_setting('arwai_openseadragon_options_group', self::OPTION_OSD_NAV_WRAP, ['type' => 'boolean', 'sanitize_callback' => 'rest_sanitize_boolean', 'default' => true]);
+        add_settings_field('field_osd_prefix_url', 'Prefix URL for Controls', array($this, 'field_osd_prefix_url_callback'), 'arwai-openseadragon-settings', 'arwai_openseadragon_settings_section_osd');
+        add_settings_field('field_osd_controls', 'Viewer Controls', array($this, 'field_osd_controls_callback'), 'arwai-openseadragon-settings', 'arwai_openseadragon_settings_section_osd');
+        
+        // Annotorious Settings
+        add_settings_section('arwai_openseadragon_settings_section_annotorious', 'Annotorious Annotations Settings', null, 'arwai-openseadragon-settings');
+        register_setting('arwai_openseadragon_options_group', self::OPTION_ANNO_READ_ONLY, ['type' => 'boolean', 'sanitize_callback' => 'rest_sanitize_boolean', 'default' => false]);
+        register_setting('arwai_openseadragon_options_group', self::OPTION_ANNO_ALLOW_EMPTY, ['type' => 'boolean', 'sanitize_callback' => 'rest_sanitize_boolean', 'default' => false]);
+        register_setting('arwai_openseadragon_options_group', self::OPTION_ANNO_DRAW_ON_SINGLE_CLICK, ['type' => 'boolean', 'sanitize_callback' => 'rest_sanitize_boolean', 'default' => false]);
+        register_setting('arwai_openseadragon_options_group', self::OPTION_ANNO_TAGS_LINK_TAXONOMY, ['type' => 'string', 'sanitize_callback' => 'sanitize_text_field', 'default' => 'none']);
+        add_settings_field('field_anno_options', 'Annotation Options', array($this, 'field_anno_options_callback'), 'arwai-openseadragon-settings', 'arwai_openseadragon_settings_section_annotorious');
     }
     
+    // Sanitization Callbacks
     public function sanitize_display_mode_option( $input ) { $valid_options = array( 'metabox_viewer', 'gutenberg_block' ); return in_array( $input, $valid_options, true ) ? $input : 'metabox_viewer'; }
     public function sanitize_active_post_types_option( $input ) { $sanitized_input = array(); if ( is_array( $input ) ) { $all_registered_post_types = get_post_types( array( 'public' => true ), 'names' ); foreach ( $input as $post_type_slug ) { $slug = sanitize_key( $post_type_slug ); if ( in_array( $slug, $all_registered_post_types, true ) && $slug !== 'attachment' ) { $sanitized_input[] = $slug; } } } return !empty($sanitized_input) ? $sanitized_input : array('post', 'page'); }
-    public function settings_section_main_callback() { echo '<p>Configure global settings for the plugin. The primary display choice for individual posts is managed on its edit screen. Here you can set the default mode for new posts and select which post types the plugin activates for.</p>'; }
 
+    // Section Callbacks
+    public function settings_section_main_callback() { echo '<p>Configure global settings for the plugin. The primary display choice for individual posts is managed on its edit screen. Here you can set the default mode for new posts and select which post types the plugin activates for.</p>'; }
+    
+    // Field Callbacks
     public function default_new_post_mode_callback() {
         $option_value = get_option( self::OPTION_DEFAULT_NEW_POST_MODE, 'metabox_viewer' );
         ?>
@@ -84,6 +123,69 @@ class Openseadragon_Annotorious {
             <?php foreach ( $post_types as $post_type ) : if ( $post_type->name === 'attachment' ) continue; ?>
                 <label><input type="checkbox" name="<?php echo esc_attr( self::OPTION_ACTIVE_POST_TYPES ); ?>[]" value="<?php echo esc_attr( $post_type->name ); ?>" <?php checked( in_array( $post_type->name, $saved_options, true ) ); ?> /> <?php echo esc_html( $post_type->labels->name ); ?></label><br />
             <?php endforeach; ?>
+        </fieldset>
+        <?php
+    }
+
+    public function field_osd_prefix_url_callback() {
+        $prefix_url = get_option(self::OPTION_OSD_PREFIX_URL, ARWAI_OPENSEADRAGON_ANNOTORIOUS_URL . 'assets/images/');
+        ?>
+        <input type="text" name="<?php echo esc_attr(self::OPTION_OSD_PREFIX_URL); ?>" value="<?php echo esc_url($prefix_url); ?>" class="regular-text">
+        <p class="description">URL to the folder containing OpenSeadragon button images.</p>
+        <?php
+    }
+
+    public function field_osd_controls_callback() {
+        ?>
+        <fieldset>
+            <legend class="screen-reader-text"><span>Viewer Controls</span></legend>
+            <label><input type="checkbox" name="<?php echo esc_attr(self::OPTION_OSD_SEQUENCE_MODE); ?>" value="1" <?php checked(get_option(self::OPTION_OSD_SEQUENCE_MODE, true)); ?> /> Sequence Mode</label>
+            <p class="description">Enable navigation between multiple images.</p>
+            <br>
+            <label><input type="checkbox" name="<?php echo esc_attr(self::OPTION_OSD_SHOW_SEQ_CONTROL); ?>" value="1" <?php checked(get_option(self::OPTION_OSD_SHOW_SEQ_CONTROL, true)); ?> /> Show Sequence Control</label>
+            <p class="description">Show the previous/next buttons.</p>
+            <br>
+            <label><input type="checkbox" name="<?php echo esc_attr(self::OPTION_OSD_SHOW_REF_STRIP); ?>" value="1" <?php checked(get_option(self::OPTION_OSD_SHOW_REF_STRIP, true)); ?> /> Show Reference Strip</label>
+            <p class="description">Show the filmstrip of image thumbnails.</p>
+            <br>
+            <label><input type="checkbox" name="<?php echo esc_attr(self::OPTION_OSD_SHOW_ROTATION); ?>" value="1" <?php checked(get_option(self::OPTION_OSD_SHOW_ROTATION, true)); ?> /> Show Rotation Control</label>
+            <p class="description">Show the image rotation buttons.</p>
+            <br>
+            <label><input type="checkbox" name="<?php echo esc_attr(self::OPTION_OSD_NAV_WRAP); ?>" value="1" <?php checked(get_option(self::OPTION_OSD_NAV_WRAP, true)); ?> /> Wrap Navigation</label>
+            <p class="description">Loop from the last image back to the first, and vice-versa.</p>
+        </fieldset>
+        <?php
+    }
+
+    public function field_anno_options_callback() {
+        ?>
+        <fieldset>
+            <legend class="screen-reader-text"><span>Behavior Options</span></legend>
+            <label><input type="checkbox" name="<?php echo esc_attr(self::OPTION_ANNO_READ_ONLY); ?>" value="1" <?php checked(get_option(self::OPTION_ANNO_READ_ONLY, false)); ?> /> Read Only</label>
+            <p class="description">Prevent users from creating, editing, or deleting annotations.</p>
+            <br>
+            <label><input type="checkbox" name="<?php echo esc_attr(self::OPTION_ANNO_ALLOW_EMPTY); ?>" value="1" <?php checked(get_option(self::OPTION_ANNO_ALLOW_EMPTY, false)); ?> /> Allow Empty Annotations</label>
+            <p class="description">Allow users to save annotations that do not contain any text or tags.</p>
+            <br>
+            <label><input type="checkbox" name="<?php echo esc_attr(self::OPTION_ANNO_DRAW_ON_SINGLE_CLICK); ?>" value="1" <?php checked(get_option(self::OPTION_ANNO_DRAW_ON_SINGLE_CLICK, false)); ?> /> Draw on Single Click</label>
+            <p class="description">Allows users to draw rectangles with a single mouse click (instead of drag-and-drop).</p>
+
+        </fieldset>
+        <br>
+        <fieldset>
+            <legend style="padding-bottom: 5px;">Tagging</legend>
+            <label for="<?php echo esc_attr(self::OPTION_ANNO_TAGS_LINK_TAXONOMY); ?>">Link Tags to Taxonomy</label><br>
+            <select name="<?php echo esc_attr(self::OPTION_ANNO_TAGS_LINK_TAXONOMY); ?>" id="<?php echo esc_attr(self::OPTION_ANNO_TAGS_LINK_TAXONOMY); ?>">
+                <option value="none" <?php selected(get_option(self::OPTION_ANNO_TAGS_LINK_TAXONOMY, 'none'), 'none'); ?>>Do not link (freeform tags)</option>
+                <?php
+                $taxonomies = get_taxonomies(['public' => true], 'objects');
+                $current_selection = get_option(self::OPTION_ANNO_TAGS_LINK_TAXONOMY, 'none');
+                foreach ($taxonomies as $taxonomy) {
+                    echo '<option value="' . esc_attr($taxonomy->name) . '" ' . selected($current_selection, $taxonomy->name, false) . '>' . esc_html($taxonomy->labels->name) . '</option>';
+                }
+                ?>
+            </select>
+            <p class="description">Both Comment and Tag widgets are always enabled. This setting syncs the tag vocabulary with a WordPress taxonomy.</p>
         </fieldset>
         <?php
     }
@@ -125,9 +227,48 @@ class Openseadragon_Annotorious {
                     wp_enqueue_script( 'arwai-annotorious-osd-plugin-js', ARWAI_OPENSEADRAGON_ANNOTORIOUS_URL . 'assets/js/annotorious/openseadragon-annotorious.min.js', array( 'arwai-openseadragon-js', 'arwai-annotorious-core-js' ), null, true );
                     wp_enqueue_script( 'arwai-public-js', ARWAI_OPENSEADRAGON_ANNOTORIOUS_URL . 'assets/js/public/script.js', array('jquery', 'arwai-annotorious-osd-plugin-js'), null, true);
                     
-                    wp_localize_script( 'arwai-public-js', 'ArwaiOSD_ViewerConfig', ['id' => 'openseadragon-viewer-' . $post_id, 'images' => $image_sources, 'currentPostId' => $post_id] );
-                    // CORRECTED: Pass the local prefixUrl for OSD button images to the script
-                    wp_localize_script( 'arwai-public-js', 'ArwaiOSD_Vars', ['ajax_url' => admin_url( 'admin-ajax.php' ), 'prefixUrl' => ARWAI_OPENSEADRAGON_ANNOTORIOUS_URL . 'assets/images/'] );
+                    // Viewer Configuration
+                    $viewer_config = [
+                        'id' => 'openseadragon-viewer-' . $post_id, 
+                        'images' => $image_sources, 
+                        'currentPostId' => $post_id
+                    ];
+                    wp_localize_script( 'arwai-public-js', 'ArwaiOSD_ViewerConfig', $viewer_config );
+                    
+                    // Prepare Annotorious options
+                    $linked_taxonomy = get_option(self::OPTION_ANNO_TAGS_LINK_TAXONOMY, 'none');
+                    $anno_options = [
+                        'readOnly' => rest_sanitize_boolean(get_option(self::OPTION_ANNO_READ_ONLY, false)),
+                        'allowEmpty' => rest_sanitize_boolean(get_option(self::OPTION_ANNO_ALLOW_EMPTY, false)),
+                        'drawOnSingleClick' => rest_sanitize_boolean(get_option(self::OPTION_ANNO_DRAW_ON_SINGLE_CLICK, false)),
+                        'linkTaxonomy' => $linked_taxonomy,
+                        'addTermNonce' => wp_create_nonce( 'arwai_add_term_nonce' ),
+                        'tagVocabulary' => []
+                    ];
+
+                    if ($linked_taxonomy !== 'none') {
+                        $terms = get_terms(['taxonomy' => $linked_taxonomy, 'hide_empty' => false]);
+                        if (!is_wp_error($terms) && !empty($terms)) {
+                            $anno_options['tagVocabulary'] = wp_list_pluck($terms, 'name');
+                        }
+                    }
+
+                    // Viewer and Annotorious Options from Settings
+                    $options = [
+                        'osd_options' => [
+                            'prefixUrl' => get_option(self::OPTION_OSD_PREFIX_URL, ARWAI_OPENSEADRAGON_ANNOTORIOUS_URL . 'assets/images/'),
+                            'sequenceMode' => rest_sanitize_boolean(get_option(self::OPTION_OSD_SEQUENCE_MODE, true)),
+                            'showSequenceControl' => rest_sanitize_boolean(get_option(self::OPTION_OSD_SHOW_SEQ_CONTROL, true)),
+                            'showReferenceStrip' => rest_sanitize_boolean(get_option(self::OPTION_OSD_SHOW_REF_STRIP, true)),
+                            'showRotationControl' => rest_sanitize_boolean(get_option(self::OPTION_OSD_SHOW_ROTATION, true)),
+                            'navPrevNextWrap' => rest_sanitize_boolean(get_option(self::OPTION_OSD_NAV_WRAP, true)),
+                        ],
+                        'anno_options' => $anno_options
+                    ];
+                    wp_localize_script( 'arwai-public-js', 'ArwaiOSD_Options', $options);
+
+                    // General Variables
+                    wp_localize_script( 'arwai-public-js', 'ArwaiOSD_Vars', ['ajax_url' => admin_url( 'admin-ajax.php' )] );
                 }
             }
         }
@@ -239,6 +380,38 @@ class Openseadragon_Annotorious {
 
     // --- AJAX Functions ---
     
+    function arwai_add_taxonomy_term() {
+        check_ajax_referer( 'arwai_add_term_nonce', 'nonce' );
+
+        $taxonomy = isset($_POST['taxonomy']) ? sanitize_text_field($_POST['taxonomy']) : '';
+        $term = isset($_POST['term']) ? sanitize_text_field($_POST['term']) : '';
+
+        if ( empty($taxonomy) || empty($term) ) {
+            wp_send_json_error('Missing taxonomy or term.');
+        }
+
+        if ( ! taxonomy_exists($taxonomy) ) {
+            wp_send_json_error('Taxonomy does not exist.');
+        }
+        
+        $tax_object = get_taxonomy($taxonomy);
+        if ( ! current_user_can($tax_object->cap->manage_terms) ) {
+            wp_send_json_error('User does not have permission to add terms.');
+        }
+
+        if ( term_exists( $term, $taxonomy ) ) {
+            wp_send_json_success('Term already exists.');
+        }
+
+        $result = wp_insert_term( $term, $taxonomy );
+
+        if ( is_wp_error($result) ) {
+            wp_send_json_error($result->get_error_message());
+        } else {
+            wp_send_json_success(['term_id' => $result['term_id']]);
+        }
+    }
+
     function anno_get() {
         global $wpdb;
         $attachment_id = isset($_GET['attachment_id']) ? intval($_GET['attachment_id']) : 0;
