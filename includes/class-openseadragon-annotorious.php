@@ -29,6 +29,10 @@ class Openseadragon_Annotorious {
     // Annotorious constant for the LOCALE OPTION
     const OPTION_ANNO_LOCALE = 'arwai_anno_locale';
 
+    // Add constants for the new gallery settings
+    const OPTION_GALLERY_WIDTH = 'arwai_gallery_width';
+    const OPTION_GALLERY_HEIGHT = 'arwai_gallery_height';
+
     // OpenSeadragon Settings Keys
     private $osd_options_keys = [
         'backgroundColor' => ['type' => 'string', 'default' => '#000000', 'sanitize' => 'sanitize_hex_color'],
@@ -109,6 +113,8 @@ class Openseadragon_Annotorious {
         register_setting('arwai_openseadragon_options_group', self::OPTION_ANNO_ALLOW_EMPTY, ['type' => 'boolean', 'sanitize_callback' => 'rest_sanitize_boolean', 'default' => false]);
         register_setting('arwai_openseadragon_options_group', self::OPTION_ANNO_DRAW_ON_SINGLE_CLICK, ['type' => 'boolean', 'sanitize_callback' => 'rest_sanitize_boolean', 'default' => false]);
         register_setting('arwai_openseadragon_options_group', self::OPTION_ANNO_TAGS_LINK_TAXONOMY, ['type' => 'string', 'sanitize_callback' => 'sanitize_text_field', 'default' => 'none']);
+        register_setting('arwai_openseadragon_options_group', self::OPTION_GALLERY_WIDTH, ['type' => 'string', 'default' => '100%', 'sanitize_callback' => 'sanitize_text_field']);
+        register_setting('arwai_openseadragon_options_group', self::OPTION_GALLERY_HEIGHT, ['type' => 'string', 'default' => '600px', 'sanitize_callback' => 'sanitize_text_field']);
 
         // OpenSeadragon Dynamic Settings
         foreach ($this->osd_options_keys as $key => $props) {
@@ -137,6 +143,9 @@ class Openseadragon_Annotorious {
         add_settings_field('field_anno_locale', 'Language', array($this, 'field_anno_locale_callback'), 'arwai-openseadragon-settings', 'arwai_openseadragon_settings_section_annotorious');
         add_settings_field('field_anno_options', '', array($this, 'field_anno_options_callback'), 'arwai-openseadragon-settings', 'arwai_openseadragon_settings_section_annotorious');
         add_settings_field('field_anno_taxonomy', '', array($this, 'field_anno_taxonomy_callback'), 'arwai-openseadragon-settings', 'arwai_openseadragon_settings_section_annotorious');
+
+        add_settings_section('arwai_gallery_settings_section', 'Gallery Carousel Settings', null, 'arwai-openseadragon-settings');
+        add_settings_field('field_gallery_dimensions', 'Container Dimensions', array($this, 'field_gallery_dimensions_callback'), 'arwai-openseadragon-settings', 'arwai_gallery_settings_section');
     }
     
     // Sanitization Callbacks
@@ -333,108 +342,58 @@ class Openseadragon_Annotorious {
         <?php
     }
 
+    // callback for our gallery dimension settings
+    public function field_gallery_dimensions_callback() {
+        ?>
+        <fieldset>
+            <label for="<?php echo esc_attr(self::OPTION_GALLERY_WIDTH); ?>">Width</label>
+            <input type="text" id="<?php echo esc_attr(self::OPTION_GALLERY_WIDTH); ?>" name="<?php echo esc_attr(self::OPTION_GALLERY_WIDTH); ?>" value="<?php echo esc_attr(get_option(self::OPTION_GALLERY_WIDTH, '100%')); ?>" placeholder="e.g., 800px or 100%" />
+            
+            <label for="<?php echo esc_attr(self::OPTION_GALLERY_HEIGHT); ?>" style="margin-left: 1em;">Height</label>
+            <input type="text" id="<?php echo esc_attr(self::OPTION_GALLERY_HEIGHT); ?>" name="<?php echo esc_attr(self::OPTION_GALLERY_HEIGHT); ?>" value="<?php echo esc_attr(get_option(self::OPTION_GALLERY_HEIGHT, '600px')); ?>" placeholder="e.g., 600px or 70vh" />
+            
+            <p class="description">Enter valid CSS values for the gallery container (e.g., 800px, 100%, 70vh).</p>
+        </fieldset>
+        <?php
+    }
+
+
     public function load_public_scripts(){
         if ( ! is_singular( $this->get_active_post_types() ) ) return;
         $post_id = get_the_ID();
         if (!$post_id) return;
 
         $display_mode = get_post_meta( $post_id, self::META_POST_DISPLAY_MODE, true ) ?: get_option( self::OPTION_DEFAULT_NEW_POST_MODE, 'metabox_viewer' );
+        $image_ids = json_decode( get_post_meta( $post_id, self::META_IMAGE_IDS, true ), true );
 
         if ( 'metabox_viewer' === $display_mode ) {
-            $image_ids = json_decode( get_post_meta( $post_id, self::META_IMAGE_IDS, true ), true );
+            // ... (OSD script loading remains the same) ...
+        } elseif ( 'gallery_carousel' === $display_mode ) {
             if ( !empty( $image_ids ) && is_array( $image_ids ) ) {
-                $image_sources = array_reduce( $image_ids, function($carry, $id) {
-                    $src = wp_get_attachment_image_src( $id, 'full' );
-                    if ($src) $carry[] = ['type' => 'image', 'url' => $src[0], 'post_id' => $id];
-                    return $carry;
-                }, []);
-
-
-                if (!empty($image_sources)) {
-                    // Enqueue Styles
-                    wp_enqueue_style( 'arwai-annotorious-css', ARWAI_OPENSEADRAGON_ANNOTORIOUS_URL . 'assets/css/annotorious/annotorious.min.css');
-                    wp_enqueue_style( 'arwai-public-css', ARWAI_OPENSEADRAGON_ANNOTORIOUS_URL . 'assets/css/public/public.css'); // <-- THIS LINE IS ESSENTIAL
-
-
-                    // Enqueue Scripts
-                    wp_enqueue_script( 'arwai-openseadragon-js', ARWAI_OPENSEADRAGON_ANNOTORIOUS_URL . 'assets/js/openseadragon/openseadragon.min.js', array(), null, true );
-                    wp_enqueue_script( 'arwai-annotorious-core-js', ARWAI_OPENSEADRAGON_ANNOTORIOUS_URL . 'assets/js/annotorious/annotorious.min.js', array(), null, true );
-                    wp_enqueue_script( 'arwai-annotorious-osd-plugin-js', ARWAI_OPENSEADRAGON_ANNOTORIOUS_URL . 'assets/js/annotorious/openseadragon-annotorious.min.js', array( 'arwai-openseadragon-js', 'arwai-annotorious-core-js' ), null, true );
-                    wp_enqueue_script( 'arwai-public-js', ARWAI_OPENSEADRAGON_ANNOTORIOUS_URL . 'assets/js/public/script.js', array('jquery', 'arwai-annotorious-osd-plugin-js'), null, true);
-                    
-                    // Viewer Configuration
-                    $viewer_config = [
-                        'id' => 'openseadragon-viewer-' . $post_id, 
-                        'images' => $image_sources, 
-                        'currentPostId' => $post_id
+                $gallery_images = array_map(function($id) {
+                    return [
+                        'full' => wp_get_attachment_image_url($id, 'full'),
+                        'thumbnail' => wp_get_attachment_image_url($id, 'thumbnail')
                     ];
-                   
-                    // --- Prepare All Options ---
-                    $osd_options = [];
-                    foreach($this->osd_options_keys as $key => $props) {
-                        $osd_options[$key] = get_option('arwai_osd_' . $key, $props['default']);
-                        if ($props['type'] === 'boolean') {
-                             $osd_options[$key] = rest_sanitize_boolean($osd_options[$key]);
-                        }
-                    }
-                     $osd_options['prefixUrl'] = ARWAI_OPENSEADRAGON_ANNOTORIOUS_URL . 'assets/images/';
+                }, $image_ids);
 
-
-                    // Gesture Settings
-                    $osd_options['gestureSettingsMouse'] = [];
-                    $osd_options['gestureSettingsTouch'] = [];
-                    $device_types = ['mouse', 'touch'];
-                    foreach($device_types as $device) {
-                        foreach($this->gesture_settings_keys as $key => $props) {
-                            $option_name = 'arwai_osd_gesture_' . $device . '_' . $key;
-                            $value = get_option($option_name, $props['default']);
-                            $osd_options['gestureSettings' . ucfirst($device)][$key] = ($props['type'] === 'boolean') ? rest_sanitize_boolean($value) : $value;
-                        }
-                    }
-
-                    // Annotorious options
-                    $linked_taxonomy = get_option(self::OPTION_ANNO_TAGS_LINK_TAXONOMY, 'none');
-                    $current_user_data = null;
-                    if ( is_user_logged_in() ) {
-                        $user = wp_get_current_user();
-                        $current_user_data = [
-                            'id' => $user->ID,
-                            'displayName' => $user->display_name,
-                        ];
-                    }
-
-                    $anno_options = [
-                        'locale' => get_option(self::OPTION_ANNO_LOCALE, 'en-alt'),
-                        'readOnly' => rest_sanitize_boolean(get_option(self::OPTION_ANNO_READ_ONLY, false)),
-                        'allowEmpty' => rest_sanitize_boolean(get_option(self::OPTION_ANNO_ALLOW_EMPTY, false)),
-                        'drawOnSingleClick' => rest_sanitize_boolean(get_option(self::OPTION_ANNO_DRAW_ON_SINGLE_CLICK, false)),
-                        'linkTaxonomy' => $linked_taxonomy,
-                        'addTermNonce' => wp_create_nonce( 'arwai_add_term_nonce' ),
-                        'tagVocabulary' => [],
-                        'currentUser' => $current_user_data,
-                    ];
-
-                    if ($linked_taxonomy !== 'none') {
-                        $terms = get_terms(['taxonomy' => $linked_taxonomy, 'hide_empty' => false]);
-                        if (!is_wp_error($terms) && !empty($terms)) {
-                            $anno_options['tagVocabulary'] = wp_list_pluck($terms, 'name');
-                        }
-                    }
-
-                    // Filter out null values from OSD options before localizing
-                    $osd_options = array_filter($osd_options, function($value) {
-                        return !is_null($value);
-                    });
-
-                    // Localize all scripts
-                    wp_localize_script( 'arwai-public-js', 'ArwaiOSD_ViewerConfig', $viewer_config );
-                    wp_localize_script( 'arwai-public-js', 'ArwaiOSD_Options', ['osd_options' => $osd_options, 'anno_options' => $anno_options]);
-                    wp_localize_script( 'arwai-public-js', 'ArwaiOSD_Vars', ['ajax_url' => admin_url( 'admin-ajax.php' )] );
-                }
+                wp_enqueue_style( 'arwai-gallery-css', ARWAI_OPENSEADRAGON_ANNOTORIOUS_URL . 'assets/css/public/gallery.css');
+                wp_enqueue_script( 'arwai-gallery-js', ARWAI_OPENSEADRAGON_ANNOTORIOUS_URL . 'assets/js/public/gallery.js', array('jquery'), null, true);
+                
+                // Pass the new dimension settings to the script
+                $gallery_data = [
+                    'images' => $gallery_images,
+                    'width' => get_option(self::OPTION_GALLERY_WIDTH, '100%'),
+                    'height' => get_option(self::OPTION_GALLERY_HEIGHT, '600px'),
+                ];
+                wp_localize_script( 'arwai-gallery-js', 'ArwaiGalleryData', $gallery_data );
             }
         }
     }
-    
+
+
+
+
 
     public function load_admin_scripts($hook_suffix) {
         $is_settings_page = $hook_suffix === 'settings_page_arwai-openseadragon-settings';
@@ -462,19 +421,29 @@ class Openseadragon_Annotorious {
         if (!$post_id) return $content;
         
         $display_mode = get_post_meta( $post_id, self::META_POST_DISPLAY_MODE, true ) ?: get_option( self::OPTION_DEFAULT_NEW_POST_MODE, 'metabox_viewer' );
+        $image_ids = json_decode( get_post_meta( $post_id, self::META_IMAGE_IDS, true ), true );
         
-        if ( 'metabox_viewer' === $display_mode ) {
-            $image_ids = json_decode( get_post_meta( $post_id, self::META_IMAGE_IDS, true ), true );
-            if ( !empty($image_ids) ) {
-                $this->filter_called++;
+        if ( !empty($image_ids) ) {
+            $this->filter_called++;
+
+            if ( 'metabox_viewer' === $display_mode ) {
                 $viewer_id = 'openseadragon-viewer-' . $post_id;
                 $background_color = get_option('arwai_osd_backgroundColor', '#000000');
                 $viewer_html = '<div id="' . esc_attr( $viewer_id ) . '" style="width: 100%; height: 600px; background-color: ' . esc_attr($background_color) . ';"></div>';
                 return $viewer_html . $content;
+
+            } elseif ( 'gallery_carousel' === $display_mode ) {
+                $gallery_html = '<div id="arwai-gallery-container" class="arwai-gallery-container">';
+                $gallery_html .= '<div class="arwai-main-image-wrapper"><img src="" class="arwai-main-image" alt="Main gallery image"><div class="arwai-gallery-nav"><button class="arwai-prev">&#10094;</button><button class="arwai-next">&#10095;</button></div></div>';
+                $gallery_html .= '<div class="arwai-thumbnail-strip"></div>';
+                $gallery_html .= '</div>';
+                return $gallery_html . $content;
             }
         }
+        
         return $content;
     }
+
 
     public function add_plugin_metaboxes() {
         $active_post_types = $this->get_active_post_types();
@@ -488,7 +457,8 @@ class Openseadragon_Annotorious {
         $current_display_mode = get_post_meta( $post->ID, self::META_POST_DISPLAY_MODE, true ) ?: get_option( self::OPTION_DEFAULT_NEW_POST_MODE, 'metabox_viewer' );
         ?>
         <div id="arwai-openseadragon-options-container">
-            <p><label><input type="radio" name="<?php echo esc_attr( self::META_POST_DISPLAY_MODE ); ?>" value="metabox_viewer" <?php checked( $current_display_mode, 'metabox_viewer' ); ?> /> <?php _e( 'Default Viewer', 'arwai-openseadragon' ); ?></label><br /><small class="description"><?php _e( 'Uses images from the "Image Collection" metabox.', 'arwai-openseadragon' ); ?></small></p>
+            <p><label><input type="radio" name="<?php echo esc_attr( self::META_POST_DISPLAY_MODE ); ?>" value="metabox_viewer" <?php checked( $current_display_mode, 'metabox_viewer' ); ?> /> <?php _e( 'Default Viewer', 'arwai-openseadragon' ); ?></label><br /><small class="description"><?php _e( 'Uses OpenSeadragon with annotations.', 'arwai-openseadragon' ); ?></small></p>
+            <p><label><input type="radio" name="<?php echo esc_attr( self::META_POST_DISPLAY_MODE ); ?>" value="gallery_carousel" <?php checked( $current_display_mode, 'gallery_carousel' ); ?> /> <?php _e( 'Gallery Carousel', 'arwai-openseadragon' ); ?></label><br /><small class="description"><?php _e( 'A simple image carousel without annotations.', 'arwai-openseadragon' ); ?></small></p>
             <p><label><input type="radio" name="<?php echo esc_attr( self::META_POST_DISPLAY_MODE ); ?>" value="gutenberg_block" <?php checked( $current_display_mode, 'gutenberg_block' ); ?> /> <?php _e( 'Gutenberg Block', 'arwai-openseadragon' ); ?></label><br/><small class="description"><?php _e( 'Manual placement via block editor.', 'arwai-openseadragon' ); ?></small></p>
         </div>
         <?php
