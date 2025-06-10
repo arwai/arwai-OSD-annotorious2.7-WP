@@ -15,6 +15,7 @@ jQuery(document).ready(function($) {
     // Options from the plugin settings page
     const osdOptions = ArwaiOSD_Options.osd_options || {};
     const annoOptions = ArwaiOSD_Options.anno_options || {};
+    const currentUser = annoOptions.currentUser || null;
 
     const osdContainer = document.getElementById(viewerId);
     if (!osdContainer) {
@@ -22,28 +23,28 @@ jQuery(document).ready(function($) {
         return;
     }
     
-    // Initialize OpenSeadragon with a combination of hardcoded and dynamic options
-    const osdViewer = OpenSeadragon({
-        // Hardcoded options as per request
+    // Combine hardcoded options with dynamic options from the settings page
+    const finalOsdConfig = {
         id: viewerId,
         tileSources: images.map(img => ({
             type: img.type,
             url: img.url
         })),
-
-        // Dynamic options from settings page
         ...osdOptions 
-    });
+    };
+    
+    const osdViewer = OpenSeadragon(finalOsdConfig);
 
     // Prepare Annotorious configuration
     const annoConfig = {
         fragmentUnit: 'percent',
-        readOnly: annoOptions.readOnly,
+        // If no user is logged in, the entire annotation functionality is read-only.
+        // Otherwise, it respects the setting from the admin page.
+        readOnly: (currentUser === null) ? true : annoOptions.readOnly,
         allowEmpty: annoOptions.allowEmpty,
         drawOnSingleClick: annoOptions.drawOnSingleClick,
-        // Configure widgets. Both Tag and Comment are always on.
         widgets: [
-            'COMMENT',
+            'COMMENT', // Use the standard Comment widget
             { 
                 widget: 'TAG', 
                 vocabulary: annoOptions.tagVocabulary || [] 
@@ -54,30 +55,30 @@ jQuery(document).ready(function($) {
     // Initialize Annotorious
     const anno = OpenSeadragon.Annotorious(osdViewer, annoConfig);
 
+    // Set the user information if a WP user is logged in
+    if (currentUser) {
+        anno.setAuthInfo({
+            id: currentUser.id,
+            displayName: currentUser.displayName
+        });
+    }
+
     // --- Two-Way Tag Sync ---
     function syncTagsToWordPress(annotation) {
         const linkedTaxonomy = annoOptions.linkTaxonomy;
         const tagVocabulary = annoOptions.tagVocabulary || [];
 
-        // Proceed only if a taxonomy is linked
         if (!linkedTaxonomy || linkedTaxonomy === 'none') {
             return;
         }
 
-        // Find all tag bodies in the annotation
         const annotationTags = annotation.body
             .filter(b => b.purpose === 'tagging')
             .map(b => b.value);
         
-        // Check each tag
         annotationTags.forEach(tag => {
-            // If the tag is not in the original vocabulary, it's new
             if (tag && !tagVocabulary.includes(tag)) {
-                
-                // Add to local vocabulary to prevent duplicate requests on this page load
                 tagVocabulary.push(tag);
-
-                // Make AJAX call to add the term to the WordPress taxonomy
                 $.post(ajaxUrl, {
                     action: 'arwai_add_taxonomy_term',
                     taxonomy: linkedTaxonomy,
@@ -89,7 +90,6 @@ jQuery(document).ready(function($) {
             }
         });
     }
-
 
     // Function to load annotations for the currently visible image
     function loadAnnotationsForImage(attachmentId) {
@@ -132,21 +132,16 @@ jQuery(document).ready(function($) {
 
     // --- Annotation event handlers ---
     anno.on('createAnnotation', function(annotation) {
-        // First, save the annotation to our database
         $.post(ajaxUrl, { action: 'arwai_anno_add', annotation: JSON.stringify(annotation) });
-        // Then, sync any new tags back to WordPress
         syncTagsToWordPress(annotation);
     });
 
-    anno.on('updateAnnotation', function(annotation) {
-        // First, save the updated annotation to our database
+    anno.on('updateAnnotation', function(annotation, previous) {
         $.post(ajaxUrl, { action: 'arwai_anno_update', annotation: JSON.stringify(annotation), annotationid: annotation.id });
-        // Then, sync any new tags back to WordPress
         syncTagsToWordPress(annotation);
     });
 
     anno.on('deleteAnnotation', function(annotation) {
         $.post(ajaxUrl, { action: 'arwai_anno_delete', annotation: JSON.stringify(annotation), annotationid: annotation.id });
     });
-
 });
