@@ -4,98 +4,117 @@
  * Frontend public styles
  */
 
-/*
- * CSS for the on-canvas annotation label.
- */
+:root {
+  /* Define all colors as variables for easy editing */
+  --color-default-stroke: rgb(255, 255, 255);
+  --color-default-fill: rgba(95, 95, 95, 0.2);
+  --color-default-fill-hover: rgba(255, 255, 255, 0.5);
+  --color-default-label-bg: rgb(255, 255, 255);
+  --color-default-label-text: rgba(0, 0, 0, 1);
+
+  --color-tagged-stroke: #00a4cb;
+  --color-tagged-fill: rgba(0, 164, 203, 0.2);
+  --color-tagged-fill-hover: rgba(0, 164, 203, 0.5);
+  --color-tagged-label-bg: #00a4cb;
+  --color-tagged-label-text: rgb(255, 255, 255);
+
+  --color-important-stroke: rgb(255, 0, 0);
+  --color-important-fill: rgba(255, 0, 0, 0.2);
+  --color-important-fill-hover: rgba(255, 0, 0, 0.4);
+  --color-tagged-important-bg: #ff0000;
+  --color-tagged-important-text: rgb(255, 255, 255);
+}
 
 
-/***********
- * CSS for the on-canvas ANNOTATION ID LABEL.
- ***********/
+/********************************
+ * GENERAL ANNOTATION STYLES
+ ********************************/
 
+/* This makes the HTML label visible on the SVG canvas */
 .a9s-annotation foreignObject {
-    /* Make the container visible even if its size is 0x0 */
     overflow: visible;
-    /* Force some browsers to render the object by giving it a tiny size */
     width: 1px;
     height: 1px;
 }
 
 .a9s-annotation foreignObject label {
-    display:inline-block;
-    padding:2px 10px;
+    display: inline-block;
+    padding: 2px 10px;
 }   
 
-/* Styling for the default label itself */
 
+/********************************
+ * DEFAULT ANNOTATION STYLE
+ ********************************/
+
+/* Default label style */
 .a9s-annotation label {
-    transform:translateY(-100%) translateY(-1px) translateX(-2px);
+    transform: translateY(-100%) translateY(-1px) translateX(-2px);
     display: inline-block;
-    background-color: rgb(255, 255, 255);
-    border: 1px solid rgb(255, 255, 255);
     font-family: Arial, Helvetica, sans-serif;
-    font-size:16px;
-    color:rgba(0, 0, 0, 1);   
+    font-size: 16px;   
     padding: 4px 8px;
-    border-width:4px 4px 0 4px;
+    border-width: 4px 4px 0 4px;
     border-top-left-radius: 6px;
     border-top-right-radius: 6px;
+    background-color: var(--color-default-label-bg);
+    border: 1px solid var(--color-default-stroke);
+    color: var(--color-default-label-text);   
 }
 
+/* Default shape style */
 .a9s-annotation .a9s-inner {
     stroke-width: 4px;
-    stroke:rgb(255, 255, 255);
-    fill:rgba(95, 95, 95, 0.2);
+    stroke: var(--color-default-stroke);
+    fill: var(--color-default-fill);
 }
 
 .a9s-annotation .a9s-inner:hover {
-stroke-width: 4px;
-stroke:rgb(255, 255, 255);         
-fill:rgba(255, 255, 255, 0.512);
-
+    fill: var(--color-default-fill-hover);
 }
 
 
-
-/***********
-* CSS for the on-canvas ANNOTATION ID LABEL WITH TAGS.
-***********/
+/********************************
+ * ANNOTATION WITH TAGS
+ ********************************/
 
 .a9s-annotation.tagged label {
-    border-color:#00a4cb;
-    background-color:#00a4cb;
-    color:rgb(255, 255, 255);   
-
+    border-color: var(--color-tagged-stroke);
+    background-color: var(--color-tagged-label-bg);
+    color: var(--color-tagged-label-text);
 }
 
 .a9s-annotation.tagged .a9s-inner {
-    stroke-width:4px;
-    stroke:#00a4cb;
-    fill:rgba(0, 164, 203, 0.2);
-    /* -webkit-filter:drop-shadow(0 0 10px #00a4cb);
-            filter:drop-shadow(0 0 10px #00a4cb)); */
+    stroke-width: 4px;
+    stroke: var(--color-tagged-stroke);
+    fill: var(--color-tagged-fill);
 }
 
 .a9s-annotation.tagged .a9s-inner:hover {
-    stroke-width:4px;
-    stroke:#00a4cb;
-    fill:rgba(0, 164, 203, 0.5);
+    stroke: var(--color-tagged-stroke);
+    fill: var(--color-tagged-fill-hover);
 }
 
-/***********
-* CSS for Tag => "IMPORTANT" 
-***********/
+
+/********************************
+ * ANNOTATION WITH "IMPORTANT" TAG
+ ********************************/
+
+.a9s-annotation.important label {
+    border-color: var(--color-tagged-important-bg);
+    background-color: var(--color-tagged-important-bg);
+    color: var(--color-tagged-important-text);
+}
 
 .a9s-annotation.important .a9s-inner {
-    stroke-width:2px;
-    stroke:blue;
-    fill:rgba(0,0,255,0.1);
-    -webkit-filter:drop-shadow(0 0 10px rgba(0,0,255,0.8));
-            filter:drop-shadow(0 0 10px rgba(0,0,255,0.8));
+    stroke-width:2px;    
+    stroke: var(--color-important-stroke);
+    fill: var(--color-important-fill);
+    -webkit-filter: drop-shadow(0 0 10px var(--color-important-shadow));
+            filter: drop-shadow(0 0 10px var(--color-important-shadow));
 }
 
 .a9s-annotation.important .a9s-inner:hover {
-    stroke-width:6px;
-    stroke:blue;
-    fill:rgba(0,0,255,0.3);
+    stroke: var(--color-important-stroke);
+    fill: var(--color-important-fill-hover);
 }

@@ -34,6 +34,18 @@ const arwaiTagColorFormatter = function(annotation) {
     return null;
 }
 
+/**
+ * A formatter to change the stroke color of an annotation if it has tag of "Important".
+ */ 
+const MyImportantFormatter = function(annotation) {
+  const isImportant = annotation.bodies.find(b => {
+    return b.purpose === 'tagging' && b.value.toLowerCase() === 'important'
+  });
+  
+  if (isImportant) {
+    return 'important';
+  }
+}
 
 jQuery(document).ready(function($) {
 
@@ -98,7 +110,8 @@ jQuery(document).ready(function($) {
         drawOnSingleClick: annoOptions.drawOnSingleClick,
         formatters: [ 
             arwaiAnnotationIDFormatter, 
-            arwaiTagColorFormatter 
+            arwaiTagColorFormatter,
+            MyImportantFormatter
         ],
         locale: currentLocale,
         messages: translations[currentLocale] || translations['en-alt'],
