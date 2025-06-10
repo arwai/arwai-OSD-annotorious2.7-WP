@@ -88,13 +88,13 @@ jQuery(document).ready(function($) {
     const translations = {
         'en-alt': {
           'Add a comment...': 'Add a comment...',
-          'Add tag...': 'Add tag...',
+          'Add tag...': 'Add name or tag...',
           'Cancel': 'Cancel',
           'Done': 'Done'
         },
         'pt': {
           'Add a comment...': 'Adicionar um comentário...',
-          'Add tag...': 'Adicionar etiqueta...',
+          'Add tag...': 'Adicionar nome ouetiqueta...',
           'Cancel': 'Cancelar',
           'Done': 'Feito'
         }
