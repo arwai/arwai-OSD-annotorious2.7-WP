@@ -79,28 +79,53 @@ jQuery(document).ready(function($) {
             type: img.type,
             url: img.url
         })),
-        ...osdOptions 
+        ...osdOptions,
+        // Explicitly disable the default controls for our custom toolbar
+        // showNavigationControl: false,
+        // showZoomControl: false,
+        // showHomeControl: false,
+        // showFullPageControl: false,
+        // showRotationControl: false,
+        // showSequenceControl: false
     };
     
     const osdViewer = OpenSeadragon(finalOsdConfig);
 
-    // --- Translation Dictionary ---
-    const translations = {
-        'en-alt': {
-          'Add a comment...': 'Add a comment...',
-          'Add tag...': 'Add name or tag...',
-          'Cancel': 'Cancel',
-          'Done': 'Done'
-        },
-        'pt': {
-          'Add a comment...': 'Adicionar um comentário...',
-          'Add tag...': 'Adicionar nome ouetiqueta...',
-          'Cancel': 'Cancelar',
-          'Done': 'Feito'
-        }
-    };
+    // --- Custom Toolbar Handlers ---
+    // $('#zoom-in').on('click', function(e) { e.preventDefault(); osdViewer.viewport.zoomBy(1.2); osdViewer.viewport.applyConstraints(); });
+    // $('#zoom-out').on('click', function(e) { e.preventDefault(); osdViewer.viewport.zoomBy(0.8); osdViewer.viewport.applyConstraints(); });
+    // $('#home').on('click', function(e) { e.preventDefault(); osdViewer.viewport.goHome(); });
+    // $('#rotate-left').on('click', function(e) { e.preventDefault(); osdViewer.viewport.setRotation(osdViewer.viewport.getRotation() - 90); });
+    // $('#rotate-right').on('click', function(e) { e.preventDefault(); osdViewer.viewport.setRotation(osdViewer.viewport.getRotation() + 90); });
+    // $('#previous').on('click', function(e) { e.preventDefault(); osdViewer.goToPreviousPage(); });
+    // $('#next').on('click', function(e) { e.preventDefault(); osdViewer.goToNextPage(); });
+
+    // $('#full-page').on('click', function(e) {
+    //     e.preventDefault();
+    //     const isCurrentlyFullPage = osdViewer.isFullPage();
+    //     osdViewer.setFullScreen(!isCurrentlyFullPage);
+        
+        // Add or remove a class on the parent container to control toolbar style
+    //     const viewerContainer = $(this).closest('.viewer-container');
+    //     if (!isCurrentlyFullPage) {
+    //         viewerContainer.addClass('arwai-fullscreen-active');
+    //     } else {
+    //         viewerContainer.removeClass('arwai-fullscreen-active');
+    //     }
+    // });
+
+    // Also, handle the case where the user exits fullscreen by pressing ESC
+    // osdViewer.addHandler('full-screen', function(e) {
+    //     const viewerContainer = $('#' + viewerId).closest('.viewer-container');
+    //     if (!e.fullScreen) {
+    //         viewerContainer.removeClass('arwai-fullscreen-active');
+    //     }
+    // });
     
-    const currentLocale = annoOptions.locale || 'en-alt';
+    // --- Get translations from settings provided by PHP ---
+    const currentLocale = annoOptions.locale || 'English';
+    // Fallback to English if no locale is set
+    const allMessages = annoOptions.translations || {};
 
     // Prepare Annotorious configuration
     const annoConfig = {
@@ -114,7 +139,8 @@ jQuery(document).ready(function($) {
             MyImportantFormatter
         ],
         locale: currentLocale,
-        messages: translations[currentLocale] || translations['en-alt'],
+        // Use the dictionary from settings, with a fallback
+        messages: allMessages[currentLocale] || allMessages['en'] || {},
         widgets: [
             'COMMENT', 
             { 

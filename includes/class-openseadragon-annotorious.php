@@ -28,6 +28,7 @@ class Openseadragon_Annotorious {
     const OPTION_ANNO_TAGS_LINK_TAXONOMY = 'arwai_anno_tags_link_taxonomy';
     // Annotorious constant for the LOCALE OPTION
     const OPTION_ANNO_LOCALE = 'arwai_anno_locale';
+    const OPTION_ANNO_TRANSLATIONS = 'arwai_anno_translations'; 
 
     // OpenSeadragon Settings Keys
     private $osd_options_keys = [
@@ -98,13 +99,17 @@ class Openseadragon_Annotorious {
         return !empty($active_types) ? $active_types : array( 'post', 'page' );
     }
 
-    public function settings_init() {
+public function settings_init() {
         // Main Settings
         register_setting('arwai_openseadragon_options_group', self::OPTION_DEFAULT_NEW_POST_MODE, ['type' => 'string', 'sanitize_callback' => array( $this, 'sanitize_display_mode_option' ), 'default' => 'metabox_viewer']);
         register_setting('arwai_openseadragon_options_group', self::OPTION_ACTIVE_POST_TYPES, ['type' => 'array', 'sanitize_callback' => array( $this, 'sanitize_active_post_types_option' ), 'default' => array( 'post', 'page' )]);
         
+        // Default translations as a JSON string (used if the option is empty)
+        $default_translations_json = '{ "en-alt": { "Add a comment...": "Add a comment...", "Add tag...": "Add name or tag...", "Cancel": "Cancel", "Done": "Done" }, "pt": { "Add a comment...": "Adicionar um comentário...", "Add tag...": "Adicionar nome ouetiqueta...", "Cancel": "Cancelar", "Done": "Feito" } }';
+
         // Annotorious Settings
         register_setting('arwai_openseadragon_options_group', self::OPTION_ANNO_LOCALE, ['type' => 'string', 'sanitize_callback' => 'sanitize_text_field', 'default' => 'en-alt']);
+        register_setting('arwai_openseadragon_options_group', self::OPTION_ANNO_TRANSLATIONS, ['type' => 'string', 'sanitize_callback' => array($this, 'sanitize_translations_json'), 'default' => $default_translations_json]); // <-- REGISTER NEW SETTING
         register_setting('arwai_openseadragon_options_group', self::OPTION_ANNO_READ_ONLY, ['type' => 'boolean', 'sanitize_callback' => 'rest_sanitize_boolean', 'default' => false]);
         register_setting('arwai_openseadragon_options_group', self::OPTION_ANNO_ALLOW_EMPTY, ['type' => 'boolean', 'sanitize_callback' => 'rest_sanitize_boolean', 'default' => false]);
         register_setting('arwai_openseadragon_options_group', self::OPTION_ANNO_DRAW_ON_SINGLE_CLICK, ['type' => 'boolean', 'sanitize_callback' => 'rest_sanitize_boolean', 'default' => false]);
@@ -125,7 +130,6 @@ class Openseadragon_Annotorious {
         
         // Add settings sections
         add_settings_section('arwai_openseadragon_settings_section_main', 'Openseadragon-Annotorious Global Settings', null, 'arwai-openseadragon-settings');
-        add_settings_field('field_anno_locale', 'Language', array($this, 'field_anno_locale_callback'), 'arwai-openseadragon-settings', 'arwai_openseadragon_settings_section_annotorious');
         add_settings_field('arwai_openseadragon_active_post_types_field', 'Activate Plugin for Post Types', array( $this, 'active_post_types_callback' ), 'arwai-openseadragon-settings', 'arwai_openseadragon_settings_section_main');
         add_settings_field('arwai_openseadragon_default_new_post_mode_field', 'Default Viewer Mode for New Posts', array( $this, 'default_new_post_mode_callback' ), 'arwai-openseadragon-settings', 'arwai_openseadragon_settings_section_main');
         
@@ -135,6 +139,7 @@ class Openseadragon_Annotorious {
 
         add_settings_section('arwai_openseadragon_settings_section_annotorious', 'Annotorious Settings', null, 'arwai-openseadragon-settings');
         add_settings_field('field_anno_locale', 'Language', array($this, 'field_anno_locale_callback'), 'arwai-openseadragon-settings', 'arwai_openseadragon_settings_section_annotorious');
+        add_settings_field('field_anno_translations', '', array($this, 'field_anno_translations_callback'), 'arwai-openseadragon-settings', 'arwai_openseadragon_settings_section_annotorious'); // <-- ADD NEW FIELD
         add_settings_field('field_anno_options', '', array($this, 'field_anno_options_callback'), 'arwai-openseadragon-settings', 'arwai_openseadragon_settings_section_annotorious');
         add_settings_field('field_anno_taxonomy', '', array($this, 'field_anno_taxonomy_callback'), 'arwai-openseadragon-settings', 'arwai_openseadragon_settings_section_annotorious');
     }
@@ -142,6 +147,28 @@ class Openseadragon_Annotorious {
     // Sanitization Callbacks
     public function sanitize_display_mode_option( $input ) { $valid_options = array( 'metabox_viewer', 'gutenberg_block' ); return in_array( $input, $valid_options, true ) ? $input : 'metabox_viewer'; }
     public function sanitize_active_post_types_option( $input ) { $sanitized_input = array(); if ( is_array( $input ) ) { $all_registered_post_types = get_post_types( array( 'public' => true ), 'names' ); foreach ( $input as $post_type_slug ) { $slug = sanitize_key( $post_type_slug ); if ( in_array( $slug, $all_registered_post_types, true ) && $slug !== 'attachment' ) { $sanitized_input[] = $slug; } } } return !empty($sanitized_input) ? $sanitized_input : array('post', 'page'); }
+
+    // Sanitization callback for the translations JSON
+        public function sanitize_translations_json($input) {
+            $decoded = json_decode(wp_unslash($input), true);
+            
+            // If json_decode fails, it returns null for invalid JSON.
+            if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                // Return valid, minified JSON to save space. Use wp_json_encode for security.
+                return wp_json_encode($decoded);
+            }
+
+            // If the input is not valid JSON, show an error and return the old value.
+            add_settings_error(
+                self::OPTION_ANNO_TRANSLATIONS,
+                'invalid_json',
+                'The text you entered was not valid JSON. Your changes to the translations have not been saved.',
+                'error'
+            );
+            return get_option(self::OPTION_ANNO_TRANSLATIONS);
+        }
+
+
 
     // --- Field Callbacks ---
 
@@ -260,15 +287,60 @@ class Openseadragon_Annotorious {
     }
 
     // --- Annotorious Fields ---
-    // Language selector for Annotations
-    public function field_anno_locale_callback() {
-        $current_locale = get_option(self::OPTION_ANNO_LOCALE, 'en-alt');
+    // Language selector for Annotations, dynamically populated
+        public function field_anno_locale_callback() {
+            $current_locale = get_option(self::OPTION_ANNO_LOCALE, 'en-alt');
+            $translations_json = get_option(self::OPTION_ANNO_TRANSLATIONS);
+            $translations_array = json_decode($translations_json, true);
+
+            $available_locales = [];
+            if (json_last_error() === JSON_ERROR_NONE && is_array($translations_array)) {
+                $available_locales = array_keys($translations_array);
+            }
+
+            // Ensure the currently saved locale is always in the list, even if it was removed from the JSON.
+            // This prevents the setting from being silently lost before saving.
+            if (!in_array($current_locale, $available_locales)) {
+                $available_locales[] = $current_locale;
+            }
+            
+            // Remove duplicates and sort for a clean list
+            $available_locales = array_unique($available_locales);
+            sort($available_locales);
+            ?>
+            <p class="description">Select the language for the annotation editor pop-up. Options are generated from the keys in the Translations Dictionary below.</p>
+
+            <select name="<?php echo esc_attr(self::OPTION_ANNO_LOCALE); ?>" id="<?php echo esc_attr(self::OPTION_ANNO_LOCALE); ?>">
+                <?php if (!empty($available_locales)) : ?>
+                    <?php foreach ($available_locales as $locale_code) : ?>
+                        <option value="<?php echo esc_attr($locale_code); ?>" <?php selected($current_locale, $locale_code); ?>>
+                            <?php echo esc_html(ucfirst(str_replace('-', ' ', $locale_code))); // Makes "en-alt" -> "En alt" for readability ?>
+                        </option>
+                    <?php endforeach; ?>
+                <?php else: ?>
+                    // Fallback in case the JSON is completely empty and there's no saved option
+                    <option value="en-alt">English (Default)</option>
+                <?php endif; ?>
+            </select>
+            <?php
+        }
+
+    // Translation Dictionary JSON?
+
+    public function field_anno_translations_callback() {
+        $json_string = get_option(self::OPTION_ANNO_TRANSLATIONS);
+        // Pretty-print the JSON for readability in the textarea
+        $decoded = json_decode($json_string, true);
+        $pretty_json = (json_last_error() === JSON_ERROR_NONE) ? wp_json_encode($decoded, JSON_PRETTY_PRINT) : $json_string;
         ?>
-        <select name="<?php echo esc_attr(self::OPTION_ANNO_LOCALE); ?>" id="<?php echo esc_attr(self::OPTION_ANNO_LOCALE); ?>">
-            <option value="en-alt" <?php selected($current_locale, 'en-alt'); ?>>English</option>
-            <option value="pt" <?php selected($current_locale, 'pt'); ?>>Português</option>
-        </select>
-        <p class="description">Select the language for the annotation editor pop-up.</p>
+        <div class="arwai-toggle-list">
+            <h3 class="arwai-toggle-list-header">Translations Dictionary (JSON)</h3>
+            <div class="arwai-toggle-list-content">
+                <textarea name="<?php echo esc_attr(self::OPTION_ANNO_TRANSLATIONS); ?>" rows="10" cols="80" class="large-text code"><?php echo esc_textarea($pretty_json); ?></textarea>
+                <p class="description">Enter the complete translations dictionary in JSON format. Each top-level key should be a locale code (e.g., "en-alt", "pt").</p>
+            </div>
+        </div>
+
         <?php
     }
 
@@ -343,107 +415,116 @@ class Openseadragon_Annotorious {
         <?php
     }
 
-    public function load_public_scripts(){
-        if ( ! is_singular( $this->get_active_post_types() ) ) return;
-        $post_id = get_the_ID();
-        if (!$post_id) return;
+public function load_public_scripts(){
+    if ( ! is_singular( $this->get_active_post_types() ) ) return;
+    $post_id = get_the_ID();
+    if (!$post_id) return;
 
-        $display_mode = get_post_meta( $post_id, self::META_POST_DISPLAY_MODE, true ) ?: get_option( self::OPTION_DEFAULT_NEW_POST_MODE, 'metabox_viewer' );
+    $display_mode = get_post_meta( $post_id, self::META_POST_DISPLAY_MODE, true ) ?: get_option( self::OPTION_DEFAULT_NEW_POST_MODE, 'metabox_viewer' );
 
-        if ( 'metabox_viewer' === $display_mode ) {
-            $image_ids = json_decode( get_post_meta( $post_id, self::META_IMAGE_IDS, true ), true );
-            if ( !empty( $image_ids ) && is_array( $image_ids ) ) {
-                $image_sources = array_reduce( $image_ids, function($carry, $id) {
-                    $src = wp_get_attachment_image_src( $id, 'full' );
-                    if ($src) $carry[] = ['type' => 'image', 'url' => $src[0], 'post_id' => $id];
-                    return $carry;
-                }, []);
-
-
-                if (!empty($image_sources)) {
-                    // Enqueue Styles
-                    wp_enqueue_style( 'arwai-annotorious-css', ARWAI_OPENSEADRAGON_ANNOTORIOUS_URL . 'assets/css/annotorious/annotorious.min.css');
-                    wp_enqueue_style( 'arwai-public-css', ARWAI_OPENSEADRAGON_ANNOTORIOUS_URL . 'assets/css/public/public.css'); // <-- THIS LINE IS ESSENTIAL
+    if ( 'metabox_viewer' === $display_mode ) {
+        $image_ids = json_decode( get_post_meta( $post_id, self::META_IMAGE_IDS, true ), true );
+        if ( !empty( $image_ids ) && is_array( $image_ids ) ) {
+            $image_sources = array_reduce( $image_ids, function($carry, $id) {
+                $src = wp_get_attachment_image_src( $id, 'full' );
+                if ($src) $carry[] = ['type' => 'image', 'url' => $src[0], 'post_id' => $id];
+                return $carry;
+            }, []);
 
 
-                    // Enqueue Scripts
-                    wp_enqueue_script( 'arwai-openseadragon-js', ARWAI_OPENSEADRAGON_ANNOTORIOUS_URL . 'assets/js/openseadragon/openseadragon.min.js', array(), null, true );
-                    wp_enqueue_script( 'arwai-annotorious-core-js', ARWAI_OPENSEADRAGON_ANNOTORIOUS_URL . 'assets/js/annotorious/annotorious.min.js', array(), null, true );
-                    wp_enqueue_script( 'arwai-annotorious-osd-plugin-js', ARWAI_OPENSEADRAGON_ANNOTORIOUS_URL . 'assets/js/annotorious/openseadragon-annotorious.min.js', array( 'arwai-openseadragon-js', 'arwai-annotorious-core-js' ), null, true );
-                    wp_enqueue_script( 'arwai-public-js', ARWAI_OPENSEADRAGON_ANNOTORIOUS_URL . 'assets/js/public/script.js', array('jquery', 'arwai-annotorious-osd-plugin-js'), null, true);
-                    
-                    // Viewer Configuration
-                    $viewer_config = [
-                        'id' => 'openseadragon-viewer-' . $post_id, 
-                        'images' => $image_sources, 
-                        'currentPostId' => $post_id
-                    ];
-                   
-                    // --- Prepare All Options ---
-                    $osd_options = [];
-                    foreach($this->osd_options_keys as $key => $props) {
-                        $osd_options[$key] = get_option('arwai_osd_' . $key, $props['default']);
-                        if ($props['type'] === 'boolean') {
-                             $osd_options[$key] = rest_sanitize_boolean($osd_options[$key]);
-                        }
+            if (!empty($image_sources)) {
+                // Enqueue Styles
+                wp_enqueue_style( 'dashicons' );
+                wp_enqueue_style( 'arwai-annotorious-css', ARWAI_OPENSEADRAGON_ANNOTORIOUS_URL . 'assets/css/annotorious/annotorious.min.css');
+                wp_enqueue_style( 'arwai-public-css', ARWAI_OPENSEADRAGON_ANNOTORIOUS_URL . 'assets/css/public/public.css'); // <-- THIS LINE IS ESSENTIAL
+
+
+                // Enqueue Scripts
+                wp_enqueue_script( 'arwai-openseadragon-js', ARWAI_OPENSEADRAGON_ANNOTORIOUS_URL . 'assets/js/openseadragon/openseadragon.min.js', array(), null, true );
+                wp_enqueue_script( 'arwai-annotorious-core-js', ARWAI_OPENSEADRAGON_ANNOTORIOUS_URL . 'assets/js/annotorious/annotorious.min.js', array(), null, true );
+                wp_enqueue_script( 'arwai-annotorious-osd-plugin-js', ARWAI_OPENSEADRAGON_ANNOTORIOUS_URL . 'assets/js/annotorious/openseadragon-annotorious.min.js', array( 'arwai-openseadragon-js', 'arwai-annotorious-core-js' ), null, true );
+                wp_enqueue_script( 'arwai-public-js', ARWAI_OPENSEADRAGON_ANNOTORIOUS_URL . 'assets/js/public/script.js', array('jquery', 'arwai-annotorious-osd-plugin-js'), null, true);
+                
+                // Viewer Configuration
+                $viewer_config = [
+                    'id' => 'openseadragon-viewer-' . $post_id, 
+                    'images' => $image_sources, 
+                    'currentPostId' => $post_id
+                ];
+               
+                // --- Prepare All Options ---
+                $osd_options = [];
+                foreach($this->osd_options_keys as $key => $props) {
+                    $osd_options[$key] = get_option('arwai_osd_' . $key, $props['default']);
+                    if ($props['type'] === 'boolean') {
+                         $osd_options[$key] = rest_sanitize_boolean($osd_options[$key]);
                     }
-                     $osd_options['prefixUrl'] = ARWAI_OPENSEADRAGON_ANNOTORIOUS_URL . 'assets/images/';
-
-
-                    // Gesture Settings
-                    $osd_options['gestureSettingsMouse'] = [];
-                    $osd_options['gestureSettingsTouch'] = [];
-                    $device_types = ['mouse', 'touch'];
-                    foreach($device_types as $device) {
-                        foreach($this->gesture_settings_keys as $key => $props) {
-                            $option_name = 'arwai_osd_gesture_' . $device . '_' . $key;
-                            $value = get_option($option_name, $props['default']);
-                            $osd_options['gestureSettings' . ucfirst($device)][$key] = ($props['type'] === 'boolean') ? rest_sanitize_boolean($value) : $value;
-                        }
-                    }
-
-                    // Annotorious options
-                    $linked_taxonomy = get_option(self::OPTION_ANNO_TAGS_LINK_TAXONOMY, 'none');
-                    $current_user_data = null;
-                    if ( is_user_logged_in() ) {
-                        $user = wp_get_current_user();
-                        $current_user_data = [
-                            'id' => $user->ID,
-                            'displayName' => $user->display_name,
-                        ];
-                    }
-
-                    $anno_options = [
-                        'locale' => get_option(self::OPTION_ANNO_LOCALE, 'en-alt'),
-                        'readOnly' => rest_sanitize_boolean(get_option(self::OPTION_ANNO_READ_ONLY, false)),
-                        'allowEmpty' => rest_sanitize_boolean(get_option(self::OPTION_ANNO_ALLOW_EMPTY, false)),
-                        'drawOnSingleClick' => rest_sanitize_boolean(get_option(self::OPTION_ANNO_DRAW_ON_SINGLE_CLICK, false)),
-                        'linkTaxonomy' => $linked_taxonomy,
-                        'addTermNonce' => wp_create_nonce( 'arwai_add_term_nonce' ),
-                        'tagVocabulary' => [],
-                        'currentUser' => $current_user_data,
-                    ];
-
-                    if ($linked_taxonomy !== 'none') {
-                        $terms = get_terms(['taxonomy' => $linked_taxonomy, 'hide_empty' => false]);
-                        if (!is_wp_error($terms) && !empty($terms)) {
-                            $anno_options['tagVocabulary'] = wp_list_pluck($terms, 'name');
-                        }
-                    }
-
-                    // Filter out null values from OSD options before localizing
-                    $osd_options = array_filter($osd_options, function($value) {
-                        return !is_null($value);
-                    });
-
-                    // Localize all scripts
-                    wp_localize_script( 'arwai-public-js', 'ArwaiOSD_ViewerConfig', $viewer_config );
-                    wp_localize_script( 'arwai-public-js', 'ArwaiOSD_Options', ['osd_options' => $osd_options, 'anno_options' => $anno_options]);
-                    wp_localize_script( 'arwai-public-js', 'ArwaiOSD_Vars', ['ajax_url' => admin_url( 'admin-ajax.php' )] );
                 }
+                 $osd_options['prefixUrl'] = ARWAI_OPENSEADRAGON_ANNOTORIOUS_URL . 'assets/images/';
+
+
+                // Gesture Settings
+                $osd_options['gestureSettingsMouse'] = [];
+                $osd_options['gestureSettingsTouch'] = [];
+                $device_types = ['mouse', 'touch'];
+                foreach($device_types as $device) {
+                    foreach($this->gesture_settings_keys as $key => $props) {
+                        $option_name = 'arwai_osd_gesture_' . $device . '_' . $key;
+                        $value = get_option($option_name, $props['default']);
+                        $osd_options['gestureSettings' . ucfirst($device)][$key] = ($props['type'] === 'boolean') ? rest_sanitize_boolean($value) : $value;
+                    }
+                }
+
+                // Annotorious options
+                $linked_taxonomy = get_option(self::OPTION_ANNO_TAGS_LINK_TAXONOMY, 'none');
+                $current_user_data = null;
+                if ( is_user_logged_in() ) {
+                    $user = wp_get_current_user();
+                    $current_user_data = [
+                        'id' => $user->ID,
+                        'displayName' => $user->display_name,
+                    ];
+                }
+
+                // Get translations from settings, decode from JSON string to PHP array
+                $translations_json = get_option(self::OPTION_ANNO_TRANSLATIONS);
+                $translations_array = json_decode($translations_json, true);
+                if (json_last_error() !== JSON_ERROR_NONE) {
+                    $translations_array = []; // Fallback to empty if saved JSON is invalid
+                }
+
+                $anno_options = [
+                    'locale' => get_option(self::OPTION_ANNO_LOCALE, 'en-alt'),
+                    'readOnly' => rest_sanitize_boolean(get_option(self::OPTION_ANNO_READ_ONLY, false)),
+                    'allowEmpty' => rest_sanitize_boolean(get_option(self::OPTION_ANNO_ALLOW_EMPTY, false)),
+                    'drawOnSingleClick' => rest_sanitize_boolean(get_option(self::OPTION_ANNO_DRAW_ON_SINGLE_CLICK, false)),
+                    'linkTaxonomy' => $linked_taxonomy,
+                    'addTermNonce' => wp_create_nonce( 'arwai_add_term_nonce' ),
+                    'tagVocabulary' => [],
+                    'currentUser' => $current_user_data,
+                    'translations' => $translations_array, // <-- PASS TRANSLATIONS TO JS
+                ];
+
+                if ($linked_taxonomy !== 'none') {
+                    $terms = get_terms(['taxonomy' => $linked_taxonomy, 'hide_empty' => false]);
+                    if (!is_wp_error($terms) && !empty($terms)) {
+                        $anno_options['tagVocabulary'] = wp_list_pluck($terms, 'name');
+                    }
+                }
+
+                // Filter out null values from OSD options before localizing
+                $osd_options = array_filter($osd_options, function($value) {
+                    return !is_null($value);
+                });
+
+                // Localize all scripts
+                wp_localize_script( 'arwai-public-js', 'ArwaiOSD_ViewerConfig', $viewer_config );
+                wp_localize_script( 'arwai-public-js', 'ArwaiOSD_Options', ['osd_options' => $osd_options, 'anno_options' => $anno_options]);
+                wp_localize_script( 'arwai-public-js', 'ArwaiOSD_Vars', ['ajax_url' => admin_url( 'admin-ajax.php' )] );
             }
         }
     }
+}
     
 
     public function load_admin_scripts($hook_suffix) {
