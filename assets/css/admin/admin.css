@@ -12,7 +12,7 @@
 }
 
 .arwai-toggle-list .arwai-toggle-list-header:before {
-    content: '\f347'; /* Dashicon for right arrow */
+    content: '\f345'; /* Dashicon for right arrow */
     font-family: dashicons;
     display: inline-block;
     margin-right: 10px;
@@ -21,7 +21,7 @@
 }
 
 .arwai-toggle-list .arwai-toggle-list-header.open:before {
-    transform: rotate(-90deg);
+    transform: rotate(90deg);
 }
 
 .arwai-toggle-list .arwai-toggle-list-content {

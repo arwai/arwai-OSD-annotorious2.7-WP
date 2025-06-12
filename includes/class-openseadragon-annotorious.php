@@ -144,6 +144,10 @@ class Openseadragon_Annotorious {
     public function sanitize_active_post_types_option( $input ) { $sanitized_input = array(); if ( is_array( $input ) ) { $all_registered_post_types = get_post_types( array( 'public' => true ), 'names' ); foreach ( $input as $post_type_slug ) { $slug = sanitize_key( $post_type_slug ); if ( in_array( $slug, $all_registered_post_types, true ) && $slug !== 'attachment' ) { $sanitized_input[] = $slug; } } } return !empty($sanitized_input) ? $sanitized_input : array('post', 'page'); }
 
     // --- Field Callbacks ---
+
+    // ---Openseadragon-Annotorious Global Settings---
+
+    // Activate Plugin for Post Types
     public function active_post_types_callback() {
         $saved_options = $this->get_active_post_types();
         $post_types = get_post_types( array( 'public' => true ), 'objects' );
@@ -156,6 +160,7 @@ class Openseadragon_Annotorious {
         <?php
     }
 
+    // Default Viewer Mode for New Posts
     public function default_new_post_mode_callback() {
         $option_value = get_option( self::OPTION_DEFAULT_NEW_POST_MODE, 'metabox_viewer' );
         ?>
@@ -167,6 +172,7 @@ class Openseadragon_Annotorious {
     }
 
     // --- OpenSeadragon Fields ---
+    // Controls and displays
     public function field_osd_controls_options_callback() {
          ?>
         <div class="arwai-toggle-list">
@@ -218,6 +224,7 @@ class Openseadragon_Annotorious {
         <?php
     }
 
+    // Gesture Settings
     public function field_osd_gesture_options_callback() {
         ?>
         <div class="arwai-toggle-list">
@@ -252,7 +259,8 @@ class Openseadragon_Annotorious {
         <?php
     }
 
-
+    // --- Annotorious Fields ---
+    // Language selector for Annotations
     public function field_anno_locale_callback() {
         $current_locale = get_option(self::OPTION_ANNO_LOCALE, 'en-alt');
         ?>
@@ -264,7 +272,8 @@ class Openseadragon_Annotorious {
         <?php
     }
 
-    // --- Annotorious Fields ---
+    // Behaviour Options
+
     public function field_anno_options_callback() {
         ?>
         <div class="arwai-toggle-list">
@@ -285,10 +294,11 @@ class Openseadragon_Annotorious {
         <?php
     }
 
+    // Link Annotorioius Tags to WP-Tags
     public function field_anno_taxonomy_callback() {
          ?>
         <div class="arwai-toggle-list">
-            <h3 class="arwai-toggle-list-header">Link Annotorious Tags to WordPress Taxonomy</h3>
+            <h3 class="arwai-toggle-list-header">Link Annotorious Tags to WordPress Taxonomy***</h3> 
             <div class="arwai-toggle-list-content">
                 <select name="<?php echo esc_attr(self::OPTION_ANNO_TAGS_LINK_TAXONOMY); ?>" id="<?php echo esc_attr(self::OPTION_ANNO_TAGS_LINK_TAXONOMY); ?>">
                     <option value="none" <?php selected(get_option(self::OPTION_ANNO_TAGS_LINK_TAXONOMY, 'none'), 'none'); ?>>Do not link (freeform tags)</option>
@@ -300,7 +310,7 @@ class Openseadragon_Annotorious {
                     }
                     ?>
                 </select>
-                <p class="description">Both Comment and Tag widgets are always enabled. This setting syncs the tag vocabulary with a WordPress taxonomy.</p>
+                <p class="description">This setting syncs the tag vocabulary with a WordPress taxonomy. <br><strong>***Tag linkage is NOT retroactive</strong>.</p>
             </div>
         </div>
         <?php
