@@ -51,9 +51,9 @@ class Openseadragon_Annotorious {
         'showSequenceControl' => ['type' => 'boolean', 'default' => true, 'sanitize' => 'rest_sanitize_boolean'],
         'sequenceControlAnchor' => ['type' => 'string', 'default' => 'TOP_LEFT', 'sanitize' => 'sanitize_text_field'],
         'sequenceMode' => ['type' => 'boolean', 'default' => true, 'sanitize' => 'rest_sanitize_boolean'],
-        'showReferenceStrip' => ['type' => 'boolean', 'default' => false, 'sanitize' => 'rest_sanitize_boolean'],
-        'referenceStripSizeRatio' => ['type' => 'number', 'default' => 0.2, 'sanitize' => 'floatval'],
-        'referenceStripScroll' => ['type' => 'boolean', 'default' => true, 'sanitize' => 'rest_sanitize_boolean'],
+        // 'showReferenceStrip' => ['type' => 'boolean', 'default' => false, 'sanitize' => 'rest_sanitize_boolean'],
+        // 'referenceStripSizeRatio' => ['type' => 'number', 'default' => 0, 'sanitize' => 'floatval'],
+        // 'referenceStripScroll' => ['type' => 'boolean', 'default' => false, 'sanitize' => 'rest_sanitize_boolean'],
     ];
 
     private $gesture_settings_keys = [
@@ -417,6 +417,9 @@ public function settings_init() {
         <?php
     }
 
+
+
+    
 public function load_public_scripts(){
     if ( ! is_singular( $this->get_active_post_types() ) ) return;
     $post_id = get_the_ID();
