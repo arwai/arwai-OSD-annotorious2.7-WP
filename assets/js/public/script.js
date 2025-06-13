@@ -32,7 +32,7 @@ const arwaiTagColorFormatter = function(annotation) {
 /**
  * A formatter to change the stroke color of an annotation if it has tag of "Important".
  */ 
-const MyImportantFormatter = function(annotation) {
+const arwaiImportantFormatter = function(annotation) {
   const isImportant = annotation.bodies.find(b => {
     return b.purpose === 'tagging' && b.value.toLowerCase() === 'important'
   });
@@ -41,7 +41,6 @@ const MyImportantFormatter = function(annotation) {
     return 'important';
   }
 }
-
 
 
 jQuery(document).ready(function($) {
@@ -107,15 +106,11 @@ jQuery(document).ready(function($) {
         });
         updateActiveThumbnail(viewer.currentPage());
     }
-
-
-
     // --- END: Custom Reference Strip Functions ---
 
     
     // --- Get translations from settings provided by PHP ---
-    const currentLocale = annoOptions.locale || 'English';
-    // Fallback to English if no locale is set
+    const currentLocale = annoOptions.locale || 'English'; // Fallback to English if no locale is set
     const allMessages = annoOptions.translations || {};
 
     // Prepare Annotorious configuration
@@ -127,11 +122,10 @@ jQuery(document).ready(function($) {
         formatters: [ 
             arwaiAnnotationIDFormatter, 
             arwaiTagColorFormatter,
-            MyImportantFormatter
+            arwaiImportantFormatter
         ],
-        locale: currentLocale,
-        // Use the dictionary from settings, with a fallback
-        messages: allMessages[currentLocale] || allMessages['en'] || {},
+        locale: currentLocale,        // Use the dictionary from settings, with a fallback
+        messages: allMessages[currentLocale] || allMessages['English'] || {},
         widgets: [
             'COMMENT', 
             { 

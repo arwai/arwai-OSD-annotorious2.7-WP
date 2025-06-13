@@ -191,7 +191,9 @@
     padding: 10px 0;
 }
 
-.arwai-strip-scroll-arrow {
+.arwai-strip-scroll-arrow-left,
+.arwai-strip-scroll-arrow-right {
+    /* position: absolute; */
     width: 30px;
     height: 30px;
     background-color: #0073aa;
@@ -208,3 +210,12 @@
         background-color: #005f8a;
     }
 }
+
+/* .arwai-strip-scroll-arrow-left {
+    left: 0;
+    z-index: 10;
+}
+.arwai-strip-scroll-arrow-right {
+    right: 0;
+    z-index: 10;
+} */

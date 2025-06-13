@@ -53,6 +53,7 @@ class Openseadragon_Annotorious {
         'sequenceMode' => ['type' => 'boolean', 'default' => true, 'sanitize' => 'rest_sanitize_boolean'],
         'showReferenceStrip' => ['type' => 'boolean', 'default' => false, 'sanitize' => 'rest_sanitize_boolean'],
         'referenceStripSizeRatio' => ['type' => 'number', 'default' => 0.2, 'sanitize' => 'floatval'],
+        'referenceStripScroll' => ['type' => 'boolean', 'default' => true, 'sanitize' => 'rest_sanitize_boolean'],
     ];
 
     private $gesture_settings_keys = [
@@ -173,7 +174,7 @@ public function settings_init() {
 
     // --- Field Callbacks ---
 
-    // ---Openseadragon-Annotorious Global Settings---
+    // --- Openseadragon-Annotorious Global Settings ---
 
     // Activate Plugin for Post Types
     public function active_post_types_callback() {
@@ -326,7 +327,7 @@ public function settings_init() {
             <?php
         }
 
-    // Translation Dictionary JSON?
+    // Translation Dictionary JSON
 
     public function field_anno_translations_callback() {
         $json_string = get_option(self::OPTION_ANNO_TRANSLATIONS);
@@ -345,7 +346,7 @@ public function settings_init() {
         <?php
     }
 
-    // Behaviour Options
+    // Behavior Options
 
     public function field_anno_options_callback() {
         ?>
@@ -367,7 +368,7 @@ public function settings_init() {
         <?php
     }
 
-    // Link Annotorioius Tags to WP-Tags
+    // Link Annotorious Tags to WP-Tags
     public function field_anno_taxonomy_callback() {
          ?>
         <div class="arwai-toggle-list">
@@ -504,7 +505,7 @@ public function load_public_scripts(){
                 }
 
                 $anno_options = [
-                    'locale' => get_option(self::OPTION_ANNO_LOCALE, 'en-alt'),
+                    'locale' => get_option(self::OPTION_ANNO_LOCALE, 'English'),
                     'readOnly' => rest_sanitize_boolean(get_option(self::OPTION_ANNO_READ_ONLY, false)),
                     'allowEmpty' => rest_sanitize_boolean(get_option(self::OPTION_ANNO_ALLOW_EMPTY, false)),
                     'drawOnSingleClick' => rest_sanitize_boolean(get_option(self::OPTION_ANNO_DRAW_ON_SINGLE_CLICK, false)),
@@ -570,24 +571,24 @@ public function load_public_scripts(){
                     $this->filter_called++;
                     $viewer_id = 'openseadragon-viewer-' . $post_id;
                     
-                    // NEW: Added a wrapper div and the custom reference strip container
+                    // Added a wrapper div and the custom reference strip container
                     $viewer_html = "
                     <div class='arwai-viewer-wrapper'>
                     <div class='arwai-viewer-frame' style='border-radius: 20px; overflow: hidden;'>
                         <div id='" . esc_attr( $viewer_id ) . "' style='width: 100%; height: 600px; border-radius: 20px; background-color: " . esc_attr(get_option('arwai_osd_backgroundColor', '#000000')) . ";'></div>
                     </div>
                         <div class='arwai-custom-reference-strip-container'>
-                            <button id='arwai-strip-scroll-left' class='arwai-strip-scroll-arrow'>
+
+                            <button id='arwai-strip-scroll-left' class='arwai-strip-scroll-arrow-left'>
                             <span class='dashicons dashicons-arrow-left-alt2'></span>
                             </button>
 
                                 <div id='arwai-custom-reference-strip' class='arwai-custom-reference-strip'></div>
-
-                            <button id='arwai-strip-scroll-right' class='arwai-strip-scroll-arrow'>
+                            
+                            <button id='arwai-strip-scroll-right' class='arwai-strip-scroll-arrow-right'>
                             <span class='dashicons dashicons-arrow-right-alt2'></span>
                             </button>
                         </div>
-
                     </div>";
 
                     return $viewer_html . $content;
