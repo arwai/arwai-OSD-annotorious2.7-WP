@@ -26,6 +26,7 @@ class Openseadragon_Annotorious {
     const OPTION_ANNO_ALLOW_EMPTY = 'arwai_anno_allow_empty';
     const OPTION_ANNO_DRAW_ON_SINGLE_CLICK = 'arwai_anno_draw_on_single_click';
     const OPTION_ANNO_TAGS_LINK_TAXONOMY = 'arwai_anno_tags_link_taxonomy';
+
     // Annotorious constant for the LOCALE OPTION
     const OPTION_ANNO_LOCALE = 'arwai_anno_locale';
     const OPTION_ANNO_TRANSLATIONS = 'arwai_anno_translations'; 
@@ -35,7 +36,7 @@ class Openseadragon_Annotorious {
         'backgroundColor' => ['type' => 'string', 'default' => '#000000', 'sanitize' => 'sanitize_hex_color'],
         'prefixUrl' => ['type' => 'string', 'default' => '', 'sanitize' => 'esc_url_raw'],
         'autoHideControls' => ['type' => 'boolean', 'default' => true, 'sanitize' => 'rest_sanitize_boolean'],
-        'rotationIncrement' => ['type' => 'number', 'default' => 90, 'sanitize' => 'floatval'],
+        'degrees' => ['type' => 'number', 'default' => 0, 'sanitize' => 'floatval'],
         'visibilityRatio' => ['type' => 'number', 'default' => 0.5, 'sanitize' => 'floatval'],
         'controlsFadeDelay' => ['type' => 'number', 'default' => 2000, 'sanitize' => 'intval'],
         'controlsFadeLength' => ['type' => 'number', 'default' => 1500, 'sanitize' => 'intval'],
@@ -50,7 +51,7 @@ class Openseadragon_Annotorious {
         'showSequenceControl' => ['type' => 'boolean', 'default' => true, 'sanitize' => 'rest_sanitize_boolean'],
         'sequenceControlAnchor' => ['type' => 'string', 'default' => 'TOP_LEFT', 'sanitize' => 'sanitize_text_field'],
         'sequenceMode' => ['type' => 'boolean', 'default' => true, 'sanitize' => 'rest_sanitize_boolean'],
-        'showReferenceStrip' => ['type' => 'boolean', 'default' => true, 'sanitize' => 'rest_sanitize_boolean'],
+        'showReferenceStrip' => ['type' => 'boolean', 'default' => false, 'sanitize' => 'rest_sanitize_boolean'],
         'referenceStripSizeRatio' => ['type' => 'number', 'default' => 0.2, 'sanitize' => 'floatval'],
     ];
 
@@ -425,12 +426,21 @@ public function load_public_scripts(){
     if ( 'metabox_viewer' === $display_mode ) {
         $image_ids = json_decode( get_post_meta( $post_id, self::META_IMAGE_IDS, true ), true );
         if ( !empty( $image_ids ) && is_array( $image_ids ) ) {
+            
+            // UPDATED: Now fetches both full image and thumbnail URLs
             $image_sources = array_reduce( $image_ids, function($carry, $id) {
-                $src = wp_get_attachment_image_src( $id, 'full' );
-                if ($src) $carry[] = ['type' => 'image', 'url' => $src[0], 'post_id' => $id];
+                $full_src = wp_get_attachment_image_src( $id, 'full' );
+                $thumb_src = wp_get_attachment_image_src( $id, 'thumbnail' );
+                if ($full_src) {
+                    $carry[] = [
+                        'type'         => 'image',
+                        'url'          => $full_src[0],
+                        'post_id'      => $id,
+                        'thumbnailUrl' => $thumb_src ? $thumb_src[0] : '' // Pass thumbnail URL
+                    ];
+                }
                 return $carry;
             }, []);
-
 
             if (!empty($image_sources)) {
                 // Enqueue Styles
@@ -545,28 +555,47 @@ public function load_public_scripts(){
             }
         }
     }
-    
-    public function content_filter($content) {
-        if ( !is_singular( $this->get_active_post_types() ) || !in_the_loop() || !is_main_query() || $this->filter_called > 0 ) return $content;
+    // start
+        public function content_filter($content) {
+            if ( !is_singular( $this->get_active_post_types() ) || !in_the_loop() || !is_main_query() || $this->filter_called > 0 ) return $content;
 
-        $post_id = get_the_ID();
-        if (!$post_id) return $content;
-        
-        $display_mode = get_post_meta( $post_id, self::META_POST_DISPLAY_MODE, true ) ?: get_option( self::OPTION_DEFAULT_NEW_POST_MODE, 'metabox_viewer' );
-        
-        if ( 'metabox_viewer' === $display_mode ) {
-            $image_ids = json_decode( get_post_meta( $post_id, self::META_IMAGE_IDS, true ), true );
-            if ( !empty($image_ids) ) {
-                $this->filter_called++;
-                $viewer_id = 'openseadragon-viewer-' . $post_id;
-                $background_color = get_option('arwai_osd_backgroundColor', '#000000');
-                $viewer_html = '<div id="' . esc_attr( $viewer_id ) . '" style="width: 100%; height: 600px; background-color: ' . esc_attr($background_color) . ';"></div>';
-                return $viewer_html . $content;
+            $post_id = get_the_ID();
+            if (!$post_id) return $content;
+            
+            $display_mode = get_post_meta( $post_id, self::META_POST_DISPLAY_MODE, true ) ?: get_option( self::OPTION_DEFAULT_NEW_POST_MODE, 'metabox_viewer' );
+            
+            if ( 'metabox_viewer' === $display_mode ) {
+                $image_ids = json_decode( get_post_meta( $post_id, self::META_IMAGE_IDS, true ), true );
+                if ( !empty($image_ids) ) {
+                    $this->filter_called++;
+                    $viewer_id = 'openseadragon-viewer-' . $post_id;
+                    
+                    // NEW: Added a wrapper div and the custom reference strip container
+                    $viewer_html = "
+                    <div class='arwai-viewer-wrapper'>
+                    <div class='arwai-viewer-frame' style='border-radius: 20px; overflow: hidden;'>
+                        <div id='" . esc_attr( $viewer_id ) . "' style='width: 100%; height: 600px; border-radius: 20px; background-color: " . esc_attr(get_option('arwai_osd_backgroundColor', '#000000')) . ";'></div>
+                    </div>
+                        <div class='arwai-custom-reference-strip-container'>
+                            <button id='arwai-strip-scroll-left' class='arwai-strip-scroll-arrow'>
+                            <span class='dashicons dashicons-arrow-left-alt2'></span>
+                            </button>
+
+                                <div id='arwai-custom-reference-strip' class='arwai-custom-reference-strip'></div>
+
+                            <button id='arwai-strip-scroll-right' class='arwai-strip-scroll-arrow'>
+                            <span class='dashicons dashicons-arrow-right-alt2'></span>
+                            </button>
+                        </div>
+
+                    </div>";
+
+                    return $viewer_html . $content;
+                }
             }
+            return $content;
         }
-        return $content;
-    }
-
+// end
     public function add_plugin_metaboxes() {
         $active_post_types = $this->get_active_post_types();
         if (empty($active_post_types)) return;

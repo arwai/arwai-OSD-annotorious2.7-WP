@@ -20,17 +20,12 @@ const arwaiAnnotationIDFormatter = function(annotation) {
  * A formatter to change the stroke color of an annotation if it has tags.
  */
 const arwaiTagColorFormatter = function(annotation) {
-    // Find tagging bodies
     const tagBodies = annotation.body.filter(function (body) {
         return body.purpose === 'tagging';
     });
-
-    // If there is at least one tag, return a blue stroke style.
     if (tagBodies.length > 0) {
-        return 'tagged'; // This will use the default style for tagged annotations.
+        return 'tagged';
     }
-
-    // Otherwise, return null to use the default style.
     return null;
 }
 
@@ -47,24 +42,21 @@ const MyImportantFormatter = function(annotation) {
   }
 }
 
+
+
 jQuery(document).ready(function($) {
 
-    // Check if the main configuration object exists
     if (typeof ArwaiOSD_ViewerConfig === 'undefined' || !ArwaiOSD_ViewerConfig.images || ArwaiOSD_ViewerConfig.images.length === 0) {
         return;
     }
 
-    // Main Viewer Configuration
     const viewerId = ArwaiOSD_ViewerConfig.id;
     const images = ArwaiOSD_ViewerConfig.images;
-    
-    // Global variables (like AJAX URL)
     const ajaxUrl = ArwaiOSD_Vars.ajax_url;
-
-    // Options from the plugin settings page
     const osdOptions = ArwaiOSD_Options.osd_options || {};
     const annoOptions = ArwaiOSD_Options.anno_options || {};
     const currentUser = annoOptions.currentUser || null;
+
 
     const osdContainer = document.getElementById(viewerId);
     if (!osdContainer) {
@@ -72,55 +64,54 @@ jQuery(document).ready(function($) {
         return;
     }
     
-    // Combine hardcoded options with dynamic options from the settings page
     const finalOsdConfig = {
         id: viewerId,
+        // Pass thumbnail URL to OSD's internal tileSources object
         tileSources: images.map(img => ({
             type: img.type,
-            url: img.url
+            url: img.url,
+            thumbnail: img.thumbnailUrl
         })),
-        ...osdOptions,
-        // Explicitly disable the default controls for our custom toolbar
-        // showNavigationControl: false,
-        // showZoomControl: false,
-        // showHomeControl: false,
-        // showFullPageControl: false,
-        // showRotationControl: false,
-        // showSequenceControl: false
+        ...osdOptions 
     };
     
     const osdViewer = OpenSeadragon(finalOsdConfig);
 
-    // --- Custom Toolbar Handlers ---
-    // $('#zoom-in').on('click', function(e) { e.preventDefault(); osdViewer.viewport.zoomBy(1.2); osdViewer.viewport.applyConstraints(); });
-    // $('#zoom-out').on('click', function(e) { e.preventDefault(); osdViewer.viewport.zoomBy(0.8); osdViewer.viewport.applyConstraints(); });
-    // $('#home').on('click', function(e) { e.preventDefault(); osdViewer.viewport.goHome(); });
-    // $('#rotate-left').on('click', function(e) { e.preventDefault(); osdViewer.viewport.setRotation(osdViewer.viewport.getRotation() - 90); });
-    // $('#rotate-right').on('click', function(e) { e.preventDefault(); osdViewer.viewport.setRotation(osdViewer.viewport.getRotation() + 90); });
-    // $('#previous').on('click', function(e) { e.preventDefault(); osdViewer.goToPreviousPage(); });
-    // $('#next').on('click', function(e) { e.preventDefault(); osdViewer.goToNextPage(); });
+    // --- Custom Reference Strip Functions ---
+    function updateActiveThumbnail(page) {
+        const strip = document.getElementById('arwai-custom-reference-strip');
+        if (!strip) return;
+        strip.querySelectorAll('img').forEach(thumb => thumb.classList.remove('active'));
+        const activeThumb = strip.querySelector(`img[data-page-index="${page}"]`);
+        if (activeThumb) {
+            activeThumb.classList.add('active');
+            activeThumb.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+        }
+    }
 
-    // $('#full-page').on('click', function(e) {
-    //     e.preventDefault();
-    //     const isCurrentlyFullPage = osdViewer.isFullPage();
-    //     osdViewer.setFullScreen(!isCurrentlyFullPage);
-        
-        // Add or remove a class on the parent container to control toolbar style
-    //     const viewerContainer = $(this).closest('.viewer-container');
-    //     if (!isCurrentlyFullPage) {
-    //         viewerContainer.addClass('arwai-fullscreen-active');
-    //     } else {
-    //         viewerContainer.removeClass('arwai-fullscreen-active');
-    //     }
-    // });
+    function createCustomReferenceStrip(viewer) {
+        const container = document.getElementById('arwai-custom-reference-strip');
+        if (!container || viewer.tileSources.length <= 1) {
+            if (container) container.style.display = 'none';
+            return;
+        }
+        container.innerHTML = '';
+        viewer.tileSources.forEach((tileSource, index) => {
+            if (!tileSource.thumbnail) return;
+            const thumb = document.createElement('img');
+            thumb.src = tileSource.thumbnail;
+            thumb.className = 'arwai-thumbnail';
+            thumb.dataset.pageIndex = index;
+            thumb.addEventListener('click', () => viewer.goToPage(index));
+            container.appendChild(thumb);
+        });
+        updateActiveThumbnail(viewer.currentPage());
+    }
 
-    // Also, handle the case where the user exits fullscreen by pressing ESC
-    // osdViewer.addHandler('full-screen', function(e) {
-    //     const viewerContainer = $('#' + viewerId).closest('.viewer-container');
-    //     if (!e.fullScreen) {
-    //         viewerContainer.removeClass('arwai-fullscreen-active');
-    //     }
-    // });
+
+
+    // --- END: Custom Reference Strip Functions ---
+
     
     // --- Get translations from settings provided by PHP ---
     const currentLocale = annoOptions.locale || 'English';
@@ -212,20 +203,48 @@ jQuery(document).ready(function($) {
         });
     }
 
-    // Load annotations when the viewer opens the first image
-    osdViewer.addHandler('open', function() {
+
+     osdViewer.addHandler('open', function() {
         const currentPage = osdViewer.currentPage();
         if (images[currentPage]) {
             loadAnnotationsForImage(images[currentPage].post_id);
         }
+        createCustomReferenceStrip(osdViewer);
+
+        const scrollableDiv = document.getElementById('arwai-custom-reference-strip');
+
+        // --- Draggable Reference Strip Logic ---
+        if (scrollableDiv) {
+            let isDragging = false, startX, scrollLeft;
+            scrollableDiv.style.cursor = 'grab';
+            scrollableDiv.addEventListener('mousedown', (e) => { isDragging = true; scrollableDiv.style.cursor = 'grabbing'; startX = e.pageX - scrollableDiv.offsetLeft; scrollLeft = scrollableDiv.scrollLeft; });
+            scrollableDiv.addEventListener('mouseleave', () => { isDragging = false; scrollableDiv.style.cursor = 'grab'; });
+            scrollableDiv.addEventListener('mouseup', () => { isDragging = false; scrollableDiv.style.cursor = 'grab'; });
+            scrollableDiv.addEventListener('mousemove', (e) => { if (!isDragging) return; e.preventDefault(); const x = e.pageX - scrollableDiv.offsetLeft; const walk = (x - startX); scrollableDiv.scrollLeft = scrollLeft - walk; });
+        }
+        
+        // --- Arrow Scroll for Reference Strip ---
+        const scrollAmount = 400; // Adjust as needed
+        const leftArrow = document.getElementById('arwai-strip-scroll-left');
+        const rightArrow = document.getElementById('arwai-strip-scroll-right');
+
+        if (leftArrow && rightArrow && scrollableDiv) {
+            leftArrow.addEventListener('click', () => {
+                scrollableDiv.scrollBy({ left: -scrollAmount, behavior: 'smooth' });
+            });
+
+            rightArrow.addEventListener('click', () => {
+                scrollableDiv.scrollBy({ left: scrollAmount, behavior: 'smooth' });
+            });
+        }
     });
 
-    // Load annotations when the page changes
     osdViewer.addHandler('page', function(event) {
         const newPage = event.page;
         if (images[newPage]) {
             loadAnnotationsForImage(images[newPage].post_id);
         }
+        updateActiveThumbnail(newPage); // Update the active thumbnail highlight
     });
 
     // --- Annotation event handlers ---
