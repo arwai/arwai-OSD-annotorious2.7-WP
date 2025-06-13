@@ -1,0 +1,39 @@
+.arwai-toggle-list .arwai-toggle-list-header {
+    cursor: pointer;
+    padding: 10px;
+    background: #f7f7f7;
+    border: 1px solid #ccd0d4;
+    border-radius: 4px 4px 0 0;
+    margin: 0;
+    font-size: 14px;
+    font-weight: 600;
+        /* border-bottom: 0 !important; */
+
+}
+
+.arwai-toggle-list .arwai-toggle-list-header:before {
+    content: '\f345'; /* Dashicon for right arrow */
+    font-family: dashicons;
+    display: inline-block;
+    margin-right: 10px;
+    vertical-align: middle;
+    transition: transform 0.2s ease-in-out;
+}
+
+.arwai-toggle-list .arwai-toggle-list-header.open:before {
+    transform: rotate(90deg);
+}
+
+.arwai-toggle-list .arwai-toggle-list-content {
+    padding: 15px;
+    /* border: 1px solid #ccd0d4; */
+    border-top: none;
+    background: #fff;
+
+}
+
+.arwai-toggle-list {
+    border: 1px solid #ccd0d4;
+        border-radius: 4px;
+
+}
